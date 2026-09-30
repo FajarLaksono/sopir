@@ -1,0 +1,18 @@
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+# Matches the toolchain described in AGENTS.md: Black, isort and flake8.
+# pyupgrade and bugbear are deliberately not enabled: bugbear's B008 in
+# particular fires on FastAPI's Depends()/Query() argument defaults, which are
+# the framework's documented idiom rather than a defect.
+select = ["E", "F", "I", "W"]
+
+[tool.ruff.lint.per-file-ignores]
+# alembic injects the project root onto sys.path before importing, so its
+# imports are intentionally not at the top of the file
+"alembic/env.py" = ["E402"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["backend", "scenario_gen", "simulation", "evaluation", "dashboard"]

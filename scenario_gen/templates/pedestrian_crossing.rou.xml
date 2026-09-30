@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<routes>
+    <vType id="car" accel="2.6" decel="4.5" sigma="0.5" length="5" minGap="2.5" maxSpeed="20"/>
+    <vType id="walker" vClass="pedestrian" accel="1.0" decel="1.0" sigma="0.0" length="0.60" minGap="0" maxSpeed="1.39"/>
+
+    <route id="r_eb" edges="W_in E_out"/>
+    <route id="r_wb" edges="E_in W_out"/>
+
+    <!-- netconvert added the walkways as lane 0 of each edge, so the carriageway
+         is lane 1 and that is where the vehicles depart from. Each walk is spelled
+         out edge by edge so the pedestrian is forced over the generated crossing
+         edge :Jc_c0, the only link between the two footways, which puts the person
+         directly in the path of the vehicles. Entries are ordered by departure time
+         as SUMO requires; the timings are staggered so somebody is on the
+         carriageway when a car arrives. -->
+    <vehicle id="ego" type="car" route="r_eb" depart="0" departLane="1" departSpeed="10" color="1,0,0"/>
+    <vehicle id="traffic" type="car" route="r_wb" depart="8" departLane="1" departSpeed="12" color="0,0,1"/>
+    <person id="ped_1" type="walker" depart="14" departPos="20.00" color="1,0,1">
+        <walk edges="E_out :Jc_w1 :Jc_c0 :Jc_w0 W_out" departLane="0" arrivalLane="0" arrivalPos="20.00"/>
+    </person>
+    <vehicle id="crosser" type="car" route="r_eb" depart="16" departLane="1" departSpeed="14" color="1,1,0"/>
+    <person id="ped_2" type="walker" depart="30" departPos="45.00" color="0,1,1">
+        <walk edges="E_out :Jc_w1 :Jc_c0 :Jc_w0 W_out" departLane="0" arrivalLane="0" arrivalPos="45.00"/>
+    </person>
+</routes>

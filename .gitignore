@@ -1,0 +1,31 @@
+# Environment variables (secrets)
+.env
+
+# Ignore the following files and directories
+Automated Driving Portfolio Guidance.pdf
+
+# log files
+.coverage
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# QA
+.pytest_cache/

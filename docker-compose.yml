@@ -1,0 +1,79 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: opendrivelab-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: opendrivelab
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - opendrivelab
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: opendrivelab-backend
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/opendrivelab
+      POLL_INTERVAL: "5"
+      TELEMETRY_BATCH_SIZE: "100"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - scenario_data:/data/scenarios
+    networks:
+      - opendrivelab
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    # container_name: opendrivelab-worker
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/opendrivelab
+      POLL_INTERVAL: "5"
+      TELEMETRY_BATCH_SIZE: "100"
+      SUMO_HOME: /usr/share/sumo
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - scenario_data:/data/scenarios
+    networks:
+      - opendrivelab
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    container_name: opendrivelab-dashboard
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/opendrivelab
+    depends_on:
+      - backend
+    ports:
+      - "8501:8501"
+    networks:
+      - opendrivelab
+
+volumes:
+  postgres_data:
+  scenario_data:
+
+networks:
+  opendrivelab:
+    driver: bridge

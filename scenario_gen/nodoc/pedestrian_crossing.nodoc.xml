@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Two-lane road with a junction at the midpoint, used as the host for a
+  pedestrian crossing. netconvert is run with the no-turnarounds option on and
+  both sidewalks.guess and crossings.guess enabled, so it generates the walkways
+  alongside the road and a real crossing over the carriageway at Jc; that is what
+  lets a person on foot and a vehicle actually contend for the same space.
+-->
+<net version="1.16" junctionCornerDetail="5" limitTurnSpeed="5.50">
+    <location netOffset="0.00,0.00" convBoundary="0.00,0.00,500.00,500.00" origBoundary="0.00,0.00,500.00,500.00" projParameter="!"/>
+
+    <!-- eastbound on the south side (y=248.25) -->
+    <edge id="W_in" from="JW" to="Jc" priority="1">
+        <lane id="W_in_0" index="0" speed="13.89" length="236.00" width="3.50" allow="all" shape="0.00,248.25 236.00,248.25"/>
+    </edge>
+    <edge id="E_out" from="Jc" to="JE" priority="1">
+        <lane id="E_out_0" index="0" speed="13.89" length="236.00" width="3.50" allow="all" shape="264.00,248.25 500.00,248.25"/>
+    </edge>
+
+    <!-- westbound on the north side (y=251.75) -->
+    <edge id="E_in" from="JE" to="Jc" priority="1">
+        <lane id="E_in_0" index="0" speed="13.89" length="236.00" width="3.50" allow="all" shape="500.00,251.75 264.00,251.75"/>
+    </edge>
+    <edge id="W_out" from="Jc" to="JW" priority="1">
+        <lane id="W_out_0" index="0" speed="13.89" length="236.00" width="3.50" allow="all" shape="236.00,251.75 0.00,251.75"/>
+    </edge>
+
+    <junction id="JW" type="dead_end" x="0.00" y="250.00" incLanes="" intLanes="" shape="0.00,246.50 0.00,253.50"/>
+    <junction id="JE" type="dead_end" x="500.00" y="250.00" incLanes="" intLanes="" shape="500.00,246.50 500.00,253.50"/>
+
+    <junction id="Jc" type="priority" x="250.00" y="250.00"
+              incLanes="W_in_0 E_in_0"
+              intLanes=":Jc_0_0 :Jc_1_0"
+              shape="235.00,235.00 265.00,235.00 265.00,265.00 235.00,265.00 235.00,235.00"/>
+
+    <edge id=":Jc_0" function="internal">
+        <lane id=":Jc_0_0" index="0" speed="13.89" length="28.00" width="3.50" allow="all" shape="236.00,248.25 264.00,248.25"/>
+    </edge>
+    <edge id=":Jc_1" function="internal">
+        <lane id=":Jc_1_0" index="0" speed="13.89" length="28.00" width="3.50" allow="all" shape="264.00,251.75 236.00,251.75"/>
+    </edge>
+
+    <connection from="W_in" to="E_out" fromLane="0" toLane="0" via=":Jc_0_0" dir="s" state="M"/>
+    <connection from="E_in" to="W_out" fromLane="0" toLane="0" via=":Jc_1_0" dir="s" state="M"/>
+</net>

@@ -1,0 +1,1 @@
+docker run --rm -v "D:/Project/Github/FajarLaksono/sopir/assets/SUMO:/data" sumo-spike python3 spike_sumo.py --project /data

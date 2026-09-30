@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <input>
+        <net-file value="lane_change.net.xml"/>
+        <route-files value="lane_change.rou.xml"/>
+    </input>
+    <time>
+        <begin value="0"/>
+        <end value="100"/>
+        <step-length value="0.1"/>
+    </time>
+    <processing>
+        <collision.action value="warn"/>
+    </processing>
+</configuration>

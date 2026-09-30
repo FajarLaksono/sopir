@@ -1,0 +1,37 @@
+# Core dependencies
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
+
+# Database
+sqlalchemy==2.0.25
+asyncpg==0.29.0
+psycopg2-binary==2.9.9
+alembic==1.13.1
+
+# SUMO / Simulation
+traci==1.27.1
+sumolib==1.27.1
+
+# Data processing
+pandas==2.1.4
+numpy==1.26.3
+
+# Dashboard
+streamlit==1.30.0
+plotly==5.18.0
+
+# Utilities
+python-dotenv==1.0.0
+pyyaml==6.0.1
+typer==0.9.0
+
+# Testing
+pytest==7.4.4
+pytest-asyncio==0.23.3
+httpx==0.26.0
+
+# Code quality
+ruff==0.1.15
+mypy==1.7.1

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Three-lane highway with a single-lane on-ramp that merges at J1. The mainline
+  edges carry priority 1 and the ramp priority 2, so at the priority junction the
+  mainline has right of way and the ramp vehicle must merge into E1_0 against live
+  E0_0 traffic. That merge is the conflict the scenario exists to produce.
+  Converted with netconvert, no-turnarounds enabled.
+-->
+<net version="1.16" junctionCornerDetail="5" limitTurnSpeed="5.50">
+    <location netOffset="0.00,0.00" convBoundary="0.00,0.00,1000.00,500.00" origBoundary="0.00,0.00,1000.00,500.00" projParameter="!"/>
+
+    <!-- mainline approach: three lanes, rightmost (index 0) on the south side -->
+    <edge id="E0" from="J0" to="J1" priority="1">
+        <lane id="E0_0" index="0" speed="27.78" length="490.00" width="3.75" shape="0.00,246.25 490.00,246.25"/>
+        <lane id="E0_1" index="1" speed="27.78" length="490.00" width="3.75" shape="0.00,250.00 490.00,250.00"/>
+        <lane id="E0_2" index="2" speed="27.78" length="490.00" width="3.75" shape="0.00,253.75 490.00,253.75"/>
+    </edge>
+
+    <!-- mainline exit: three lanes continuing east -->
+    <edge id="E1" from="J1" to="J2" priority="1">
+        <lane id="E1_0" index="0" speed="27.78" length="490.00" width="3.75" shape="510.00,246.25 1000.00,246.25"/>
+        <lane id="E1_1" index="1" speed="27.78" length="490.00" width="3.75" shape="510.00,250.00 1000.00,250.00"/>
+        <lane id="E1_2" index="2" speed="27.78" length="490.00" width="3.75" shape="510.00,253.75 1000.00,253.75"/>
+    </edge>
+
+    <!-- single-lane on-ramp, approaching from the south and ending just shy of
+         the mainline so its internal lane can taper across to the right lane -->
+    <edge id="Emerge" from="Jmerge" to="J1" priority="2">
+        <lane id="Emerge_0" index="0" speed="20.00" length="184.02" width="3.75" shape="400.00,400.00 496.00,243.00"/>
+    </edge>
+
+    <junction id="J0" type="dead_end" x="0.00" y="250.00" incLanes="" intLanes="" shape="0.00,244.00 0.00,256.00"/>
+    <junction id="J2" type="dead_end" x="1000.00" y="250.00" incLanes="" intLanes="" shape="1000.00,244.00 1000.00,256.00"/>
+    <junction id="Jmerge" type="dead_end" x="400.00" y="400.00" incLanes="" intLanes="" shape="396.00,400.00 404.00,400.00"/>
+
+    <junction id="J1" type="priority" x="500.00" y="250.00"
+              incLanes="E0_0 E0_1 E0_2 Emerge_0"
+              intLanes=":J1_0_0 :J1_1_0 :J1_2_0 :J1_3_0"
+              shape="485.00,240.00 515.00,240.00 515.00,260.00 485.00,260.00 485.00,240.00"/>
+
+    <!-- straight-through internal lanes, one per mainline lane -->
+    <edge id=":J1_0" function="internal">
+        <lane id=":J1_0_0" index="0" speed="22.00" length="20.00" width="3.75" shape="490.00,246.25 510.00,246.25"/>
+    </edge>
+    <edge id=":J1_1" function="internal">
+        <lane id=":J1_1_0" index="0" speed="22.00" length="20.00" width="3.75" shape="490.00,250.00 510.00,250.00"/>
+    </edge>
+    <edge id=":J1_2" function="internal">
+        <lane id=":J1_2_0" index="0" speed="22.00" length="20.00" width="3.75" shape="490.00,253.75 510.00,253.75"/>
+    </edge>
+    <!-- merge taper: the ramp crosses over to E1_0, merging with E0_0 traffic -->
+    <edge id=":J1_3" function="internal">
+        <lane id=":J1_3_0" index="0" speed="16.00" length="14.30" width="3.75" shape="496.00,243.00 510.00,246.25"/>
+    </edge>
+
+    <!-- mainline runs straight through, one lane per lane, and the ramp crosses
+         over into the right lane. Connections are declared edge to edge with the
+         internal lane named in `via`, which is the form netconvert expects. -->
+    <connection from="E0" to="E1" fromLane="0" toLane="0" via=":J1_0_0" dir="s" state="M"/>
+    <connection from="E0" to="E1" fromLane="1" toLane="1" via=":J1_1_0" dir="s" state="M"/>
+    <connection from="E0" to="E1" fromLane="2" toLane="2" via=":J1_2_0" dir="s" state="M"/>
+    <connection from="Emerge" to="E1" fromLane="0" toLane="0" via=":J1_3_0" dir="r" state="m"/>
+</net>

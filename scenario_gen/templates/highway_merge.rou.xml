@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<routes>
+    <!-- mainline vehicles: lane changing is switched off so they have to stay in
+         the lane they spawned in and cannot dodge out of the merge conflict -->
+    <vType id="mainline" accel="2.6" decel="4.5" sigma="0.5" length="5" minGap="2.5" maxSpeed="30">
+        <param key="lcStrategic" value="0"/>
+        <param key="lcCooperative" value="0"/>
+        <param key="lcSpeedGain" value="0"/>
+    </vType>
+    <vType id="ramp" accel="2.6" decel="4.5" sigma="0.5" length="5" minGap="2.5" maxSpeed="30"/>
+
+    <route id="r_through" edges="E0 E1"/>
+    <route id="r_ramp" edges="Emerge E1"/>
+
+    <!--
+      J1 is a priority junction and the ramp edge carries priority 2 against the
+      mainline's 1, so the ramp vehicle under test has to give way to main_0 and
+      then merge into the occupied E1_0. All three lanes are populated so the
+      mainline has nowhere to go, which turns the merge into a genuine conflict
+      rather than a polite lane change. Entries are ordered by departure time as
+      SUMO requires.
+    -->
+    <vehicle id="main_0" type="mainline" route="r_through" depart="0" departLane="0" departSpeed="22" color="0,0,1"/>
+    <vehicle id="main_1" type="mainline" route="r_through" depart="0" departLane="1" departSpeed="28" color="0,1,0"/>
+    <vehicle id="main_2" type="mainline" route="r_through" depart="0" departLane="2" departSpeed="28" color="1,1,0"/>
+    <vehicle id="ego" type="ramp" route="r_ramp" depart="10" departLane="0" departSpeed="13.89" color="1,0,0"/>
+</routes>

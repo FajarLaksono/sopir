@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<routes>
+    <!-- Background traffic is pinned to its lane so it acts as an obstacle the test
+         vehicle has to negotiate rather than weaving around on its own. maxSpeed
+         keeps the slow stream genuinely slow: without it every vehicle would just
+         accelerate to the 27.78 m/s lane limit within a few seconds and the
+         overtake scenario would collapse into free-flowing traffic. -->
+    <vType id="congested" accel="1.6" decel="4.0" sigma="0.5" length="5" minGap="2.5" maxSpeed="10.00">
+        <param key="lcStrategic" value="0"/>
+        <param key="lcCooperative" value="0"/>
+        <param key="lcSpeedGain" value="0"/>
+        <param key="lcKeepRight" value="0.0"/>
+    </vType>
+    <vType id="freeflow" accel="2.6" decel="4.5" sigma="0.5" length="5" minGap="2.5" maxSpeed="30.00">
+        <param key="lcStrategic" value="0"/>
+        <param key="lcCooperative" value="0"/>
+        <param key="lcSpeedGain" value="0"/>
+        <param key="lcKeepRight" value="0.0"/>
+    </vType>
+    <!-- the vehicle under test is set up to overtake: high speed gain makes it
+         commit to the manoeuvre, while the cooperative term keeps it willing to
+         abort if the gap in the target lane closes on it -->
+    <vType id="assertive" accel="2.6" decel="4.5" sigma="0.5" length="5" minGap="2.5" maxSpeed="30.00">
+        <param key="lcStrategic" value="1.0"/>
+        <param key="lcCooperative" value="1.0"/>
+        <param key="lcSpeedGain" value="1.0"/>
+        <param key="lcKeepRight" value="0.0"/>
+        <param key="lcPush" value="0.0"/>
+    </vType>
+
+    <route id="r" edges="E0"/>
+
+    <!--
+      Two lanes are clogged at 10 m/s while the left lane runs free, so the vehicle
+      under test has to leave the queue, change up twice to clear both slow cars
+      and complete the overtake in the left lane. The first change is the tight
+      one: it is aimed at a lane running only slightly faster than its own, so the
+      gap keeps closing and the test vehicle has to brake to hold the manoeuvre.
+      That braking is the low-TTC event the evaluation stage looks for. Entries are
+      ordered by departure time as SUMO requires.
+    -->
+    <vehicle id="slow_lead" type="congested" route="r" depart="0" departLane="0" departSpeed="8" color="0,0,1"/>
+    <vehicle id="mid_traffic" type="congested" route="r" depart="0" departLane="1" departSpeed="9" color="0,1,0"/>
+    <vehicle id="cruiser" type="freeflow" route="r" depart="0" departLane="2" departSpeed="26" color="1,1,0"/>
+    <vehicle id="ego" type="assertive" route="r" depart="2" departLane="0" departSpeed="26" color="1,0,0"/>
+</routes>

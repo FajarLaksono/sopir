@@ -1,0 +1,18 @@
+FROM ghcr.io/eclipse-sumo/sumo:1.27.1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3-pip && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir --timeout=300 -r requirements.txt
+
+COPY backend ./backend
+COPY simulation ./simulation
+
+ENV PYTHONPATH=/usr/share/sumo/tools
+ENV SUMO_HOME=/usr/share/sumo
+
+CMD ["python", "-m", "simulation.worker"]

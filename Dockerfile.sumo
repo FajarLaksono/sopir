@@ -1,0 +1,9 @@
+FROM ghcr.io/eclipse-sumo/sumo:1.27.1
+
+ENV PYTHONPATH=/usr/share/sumo/tools
+
+WORKDIR /app
+
+COPY spike_sumo.py .
+
+ENTRYPOINT ["python3", "spike_sumo.py"]

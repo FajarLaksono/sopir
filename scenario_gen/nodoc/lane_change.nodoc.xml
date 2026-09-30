@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Straight three-lane road used to exercise a forced overtaking manoeuvre. The
+  three lanes are laterally offset by one lane width each, unlike a naive hand
+  authored net where every lane shares the same shape and overlaps exactly; the
+  offset is what gives a lane change actual room to happen and keeps lateral
+  position meaningful for the telemetry the evaluation stage reads.
+  Converted with netconvert, no-turnarounds enabled.
+-->
+<net version="1.16" junctionCornerDetail="5" limitTurnSpeed="5.50">
+    <location netOffset="0.00,0.00" convBoundary="0.00,0.00,1000.00,500.00" origBoundary="0.00,0.00,1000.00,500.00" projParameter="!"/>
+
+    <edge id="E0" from="J0" to="J1" priority="1">
+        <lane id="E0_0" index="0" speed="27.78" length="1000.00" width="3.75" shape="0.00,246.25 1000.00,246.25"/>
+        <lane id="E0_1" index="1" speed="27.78" length="1000.00" width="3.75" shape="0.00,250.00 1000.00,250.00"/>
+        <lane id="E0_2" index="2" speed="27.78" length="1000.00" width="3.75" shape="0.00,253.75 1000.00,253.75"/>
+    </edge>
+
+    <junction id="J0" type="dead_end" x="0.00" y="250.00" incLanes="" intLanes="" shape="0.00,244.00 0.00,256.00"/>
+    <junction id="J1" type="dead_end" x="1000.00" y="250.00" incLanes="" intLanes="" shape="1000.00,244.00 1000.00,256.00"/>
+</net>

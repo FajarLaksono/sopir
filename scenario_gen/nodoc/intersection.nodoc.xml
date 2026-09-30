@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Four-way crossroads, hand-authored in SUMO's nodoc dialect and converted into
+  templates/intersection.net.xml by netconvert with the no-turnarounds option on
+  and this file as the source.
+  Opposing directions are laterally offset by one half lane width (right-hand
+  traffic) and the eight normal edges all meet the centre junction Jc. Each
+  approach gets three dedicated internal lanes (left / through / right) so the
+  twelve connections below each have their own `via` lane; that is what makes
+  crossing paths genuinely intersect at Jc, producing the yielding, low-TTC and
+  collision events the evaluation stage looks for.
+-->
+<net version="1.16" junctionCornerDetail="5" limitTurnSpeed="5.50">
+    <location netOffset="0.00,0.00" convBoundary="0.00,0.00,500.00,500.00" origBoundary="0.00,0.00,500.00,500.00" projParameter="!"/>
+
+    <!-- east-west road: eastbound on the south side (y=248.25), westbound north (y=251.75) -->
+    <edge id="W_in" from="JW" to="Jc" priority="1">
+        <lane id="W_in_0" index="0" speed="13.89" length="236.00" width="3.50" shape="0.00,248.25 236.00,248.25"/>
+    </edge>
+    <edge id="E_out" from="Jc" to="JE" priority="1">
+        <lane id="E_out_0" index="0" speed="13.89" length="236.00" width="3.50" shape="264.00,248.25 500.00,248.25"/>
+    </edge>
+    <edge id="E_in" from="JE" to="Jc" priority="1">
+        <lane id="E_in_0" index="0" speed="13.89" length="236.00" width="3.50" shape="500.00,251.75 264.00,251.75"/>
+    </edge>
+    <edge id="W_out" from="Jc" to="JW" priority="1">
+        <lane id="W_out_0" index="0" speed="13.89" length="236.00" width="3.50" shape="236.00,251.75 0.00,251.75"/>
+    </edge>
+
+    <!-- north-south road: northbound on the east side (x=251.75), southbound west (x=248.25) -->
+    <edge id="S_in" from="JS" to="Jc" priority="1">
+        <lane id="S_in_0" index="0" speed="13.89" length="236.00" width="3.50" shape="251.75,0.00 251.75,236.00"/>
+    </edge>
+    <edge id="N_out" from="Jc" to="JN" priority="1">
+        <lane id="N_out_0" index="0" speed="13.89" length="236.00" width="3.50" shape="251.75,264.00 251.75,500.00"/>
+    </edge>
+    <edge id="N_in" from="JN" to="Jc" priority="1">
+        <lane id="N_in_0" index="0" speed="13.89" length="236.00" width="3.50" shape="248.25,500.00 248.25,264.00"/>
+    </edge>
+    <edge id="S_out" from="Jc" to="JS" priority="1">
+        <lane id="S_out_0" index="0" speed="13.89" length="236.00" width="3.50" shape="248.25,236.00 248.25,0.00"/>
+    </edge>
+
+    <junction id="JW" type="dead_end" x="0.00" y="250.00" incLanes="" intLanes="" shape="0.00,246.50 0.00,253.50"/>
+    <junction id="JE" type="dead_end" x="500.00" y="250.00" incLanes="" intLanes="" shape="500.00,246.50 500.00,253.50"/>
+    <junction id="JS" type="dead_end" x="250.00" y="0.00" incLanes="" intLanes="" shape="246.50,0.00 253.50,0.00"/>
+    <junction id="JN" type="dead_end" x="250.00" y="500.00" incLanes="" intLanes="" shape="246.50,500.00 253.50,500.00"/>
+
+    <junction id="Jc" type="priority" x="250.00" y="250.00"
+              incLanes="W_in_0 E_in_0 S_in_0 N_in_0"
+              intLanes=":Jc_0_0 :Jc_1_0 :Jc_2_0 :Jc_3_0 :Jc_4_0 :Jc_5_0 :Jc_6_0 :Jc_7_0 :Jc_8_0 :Jc_9_0 :Jc_10_0 :Jc_11_0"
+              shape="235.00,235.00 265.00,235.00 265.00,265.00 235.00,265.00 235.00,235.00"/>
+
+    <!-- eastbound approach out of W_in -->
+    <edge id=":Jc_0" function="internal">
+        <lane id=":Jc_0_0" index="0" speed="9.72" length="22.27" width="3.50" shape="236.00,248.25 251.75,264.00"/>
+    </edge>
+    <edge id=":Jc_1" function="internal">
+        <lane id=":Jc_1_0" index="0" speed="9.72" length="28.00" width="3.50" shape="236.00,248.25 264.00,248.25"/>
+    </edge>
+    <edge id=":Jc_2" function="internal">
+        <lane id=":Jc_2_0" index="0" speed="9.72" length="17.32" width="3.50" shape="236.00,248.25 248.25,236.00"/>
+    </edge>
+
+    <!-- westbound approach out of E_in -->
+    <edge id=":Jc_3" function="internal">
+        <lane id=":Jc_3_0" index="0" speed="9.72" length="22.27" width="3.50" shape="264.00,251.75 248.25,236.00"/>
+    </edge>
+    <edge id=":Jc_4" function="internal">
+        <lane id=":Jc_4_0" index="0" speed="9.72" length="28.00" width="3.50" shape="264.00,251.75 236.00,251.75"/>
+    </edge>
+    <edge id=":Jc_5" function="internal">
+        <lane id=":Jc_5_0" index="0" speed="9.72" length="17.32" width="3.50" shape="264.00,251.75 251.75,264.00"/>
+    </edge>
+
+    <!-- northbound approach out of S_in -->
+    <edge id=":Jc_6" function="internal">
+        <lane id=":Jc_6_0" index="0" speed="9.72" length="22.27" width="3.50" shape="251.75,236.00 236.00,251.75"/>
+    </edge>
+    <edge id=":Jc_7" function="internal">
+        <lane id=":Jc_7_0" index="0" speed="9.72" length="28.00" width="3.50" shape="251.75,236.00 251.75,264.00"/>
+    </edge>
+    <edge id=":Jc_8" function="internal">
+        <lane id=":Jc_8_0" index="0" speed="9.72" length="20.00" width="3.50" shape="251.75,236.00 264.00,251.75"/>
+    </edge>
+
+    <!-- southbound approach out of N_in -->
+    <edge id=":Jc_9" function="internal">
+        <lane id=":Jc_9_0" index="0" speed="9.72" length="22.27" width="3.50" shape="248.25,264.00 264.00,248.25"/>
+    </edge>
+    <edge id=":Jc_10" function="internal">
+        <lane id=":Jc_10_0" index="0" speed="9.72" length="28.00" width="3.50" shape="248.25,264.00 248.25,236.00"/>
+    </edge>
+    <edge id=":Jc_11" function="internal">
+        <lane id=":Jc_11_0" index="0" speed="9.72" length="20.00" width="3.50" shape="248.25,264.00 236.00,248.25"/>
+    </edge>
+
+    <!-- eastbound -->
+    <connection from="W_in" to="N_out" fromLane="0" toLane="0" via=":Jc_0_0" dir="l" state="M"/>
+    <connection from="W_in" to="E_out" fromLane="0" toLane="0" via=":Jc_1_0" dir="s" state="M"/>
+    <connection from="W_in" to="S_out" fromLane="0" toLane="0" via=":Jc_2_0" dir="r" state="M"/>
+
+    <!-- westbound -->
+    <connection from="E_in" to="S_out" fromLane="0" toLane="0" via=":Jc_3_0" dir="l" state="M"/>
+    <connection from="E_in" to="W_out" fromLane="0" toLane="0" via=":Jc_4_0" dir="s" state="M"/>
+    <connection from="E_in" to="N_out" fromLane="0" toLane="0" via=":Jc_5_0" dir="r" state="M"/>
+
+    <!-- northbound -->
+    <connection from="S_in" to="W_out" fromLane="0" toLane="0" via=":Jc_6_0" dir="l" state="M"/>
+    <connection from="S_in" to="N_out" fromLane="0" toLane="0" via=":Jc_7_0" dir="s" state="M"/>
+    <connection from="S_in" to="E_out" fromLane="0" toLane="0" via=":Jc_8_0" dir="r" state="M"/>
+
+    <!-- southbound -->
+    <connection from="N_in" to="E_out" fromLane="0" toLane="0" via=":Jc_9_0" dir="l" state="M"/>
+    <connection from="N_in" to="S_out" fromLane="0" toLane="0" via=":Jc_10_0" dir="s" state="M"/>
+    <connection from="N_in" to="W_out" fromLane="0" toLane="0" via=":Jc_11_0" dir="r" state="M"/>
+</net>

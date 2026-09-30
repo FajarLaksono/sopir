@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<routes>
+    <vType id="car" accel="2.6" decel="4.5" sigma="0.5" length="5" minGap="2.5" maxSpeed="20"/>
+
+    <!-- Two vehicles approach the junction from perpendicular directions at the
+         same time, so they contend for the centre and must resolve right of way.
+         That contention is what produces the low-TTC and yielding events. -->
+    <route id="r_eb_through" edges="W_in E_out"/>
+    <route id="r_nb_through" edges="S_in N_out"/>
+
+    <!-- Left turns put two vehicles on crossing paths inside the junction. -->
+    <route id="r_eb_left" edges="W_in N_out"/>
+    <route id="r_wb_left" edges="E_in S_out"/>
+
+    <vehicle id="ego" type="car" route="r_eb_through" depart="0" departLane="0" departSpeed="8" color="1,0,0"/>
+    <vehicle id="cross_1" type="car" route="r_nb_through" depart="0.5" departLane="0" departSpeed="8" color="0,0,1"/>
+    <vehicle id="left_1" type="car" route="r_eb_left" depart="14" departLane="0" departSpeed="8" color="0,1,0"/>
+    <vehicle id="left_2" type="car" route="r_wb_left" depart="14.5" departLane="0" departSpeed="8" color="1,1,0"/>
+</routes>
