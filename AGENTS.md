@@ -1,7 +1,7 @@
-# AGENTS.md - AI Agent Guidelines for OpenDriveLab
+# AGENTS.md - AI Agent Guidelines for Sopir
 
 ## Project Context
-This is a **portfolio project targeting Woven by Toyota** for an "AD/ADAS Software & Data Platform Engineer" role. The project demonstrates backend/data/cloud engineering for automated driving validation - NOT an autonomous driving AI model.
+This is a **portfolio project** for an "AD/ADAS Software & Data Platform Engineer" role. The project demonstrates backend/data/cloud engineering for automated driving validation - NOT an autonomous driving AI model.
 
 **Core Value Proposition**: "Built a validation platform that systematically generates scenarios, executes simulations, evaluates outcomes, identifies failures, and tracks them against software versions."
 
@@ -227,7 +227,7 @@ open http://localhost:8501
 
 ## Portfolio-Specific Notes
 
-### What Makes This Impressive to Woven
+### What Makes This Impressive
 1. **End-to-end validation loop** - not just simulation
 2. **Failure detection + prioritization** - shows safety mindset
 3. **Cloud-native design** - Docker, async workers, scalable architecture

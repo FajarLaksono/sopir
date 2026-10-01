@@ -1,8 +1,8 @@
-# OpenDriveLab - Automated Driving Simulation & Validation Platform
+# Sopir - Automated Driving Simulation & Validation Platform
 
 A cloud-native platform for AD/ADAS validation that systematically generates scenarios, executes SUMO simulations, records telemetry, evaluates outcomes, identifies failures, and tracks them against software versions.
 
-**Target Role**: AD/ADAS Software & Data Platform Engineer (Woven by Toyota)
+**Target Role**: AD/ADAS Software & Data Platform Engineer
 
 ---
 
@@ -353,4 +353,4 @@ open http://localhost:8501
 
 ## License
 
-MIT License - Portfolio project for Woven by Toyota application.
+MIT License - Portfolio project.

@@ -1,7 +1,7 @@
-# OpenDriveLab - Automated Driving Simulation & Validation Platform
+# Sopir - Automated Driving Simulation & Validation Platform
 
 ## Project Overview
-**Target**: Woven by Toyota portfolio project  
+**Target**: Data Engineering portfolio project  
 **Positioning**: AD/ADAS Software & Data Platform Engineer (not Autonomous Driving Engineer)  
 **Core Story**: "Built a cloud-native validation platform that systematically generates scenarios, executes SUMO simulations, records telemetry, evaluates outcomes, identifies failures, and tracks them against software versions."
 

@@ -1,4 +1,4 @@
-# OpenDriveLab Architecture
+# Sopir Architecture
 
 ## System Overview
 

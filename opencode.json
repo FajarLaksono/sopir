@@ -1,0 +1,118 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "share": "disabled",
+  "autoupdate": false,
+  "instructions": [
+    "AGENTS.md",
+    "docs/architecture.md",
+    "docs/SUMO_RESEARCH.md"
+  ],
+  "permission": {
+    "read": {
+      "*": "allow",
+      "*secrets*": "deny",
+      "*credentials*": "deny",
+      "*.pem": "deny",
+      "*.key": "deny",
+      "*.p12": "deny",
+      "*.pfx": "deny",
+      "*.keystore": "deny",
+      "*.netrc": "deny",
+      "*.npmrc": "deny",
+      "*.env": "deny",
+      "*.env.*": "deny",
+      "*.env.example": "allow",
+      "*.ssh*": "deny",
+      "*.aws*": "deny",
+      "*.git/*": "deny"
+    },
+    "edit": {
+      "*": "ask",
+      "*.md": "allow",
+      ".opencode/*": "allow",
+      "docs/*": "allow",
+      "*secrets*": "deny",
+      "*.pem": "deny",
+      "*.key": "deny",
+      "*.env": "deny",
+      "*.env.*": "deny",
+      "*.git/*": "deny"
+    },
+    "glob": {
+      "*": "allow",
+      "*secrets*": "deny",
+      "*.env": "deny",
+      "*.env.*": "deny",
+      "*.env.example": "allow",
+      "*.git/*": "deny"
+    },
+    "grep": {
+      "*": "allow",
+      "*secrets*": "deny",
+      "*.env": "deny",
+      "*.env.*": "deny",
+      "*.git/*": "deny"
+    },
+    "list": {
+      "*": "allow",
+      "*secrets*": "deny",
+      "*.env": "deny",
+      "*.env.*": "deny",
+      "*.git/*": "deny"
+    },
+    "bash": {
+      "*": "ask",
+      "ls*": "allow",
+      "git status*": "allow",
+      "git diff*": "allow",
+      "git log*": "allow",
+      "git show*": "allow",
+      "git add*": "ask",
+      "git commit*": "ask",
+      "git push*": "deny",
+      "git reset --hard*": "deny",
+      "git clean*": "deny",
+      "git checkout --*": "deny",
+      "docker compose*": "ask",
+      "docker-compose*": "ask",
+      "docker compose down -v*": "deny",
+      "docker-compose down -v*": "deny",
+      "docker system prune*": "deny",
+      "docker volume rm*": "deny",
+      "pytest*": "allow",
+      "python*": "ask",
+      "ruff check*": "allow",
+      "ruff format*": "allow",
+      "mypy*": "allow",
+      "pip install*": "ask",
+      "poetry add*": "ask",
+      "uv add*": "ask",
+      "npm install*": "ask",
+      "curl*": "deny",
+      "wget*": "deny",
+      "ssh*": "deny",
+      "scp*": "deny",
+      "rsync*": "deny",
+      "sudo*": "deny",
+      "rm*": "deny",
+      "del*": "deny",
+      "rmdir*": "deny",
+      "Remove-Item*": "deny",
+      "reg delete*": "deny",
+      "format*": "deny",
+      "mkfs*": "deny"
+    },
+    "external_directory": "deny",
+    "webfetch": "deny",
+    "websearch": "deny",
+    "todowrite": "allow",
+    "question": "allow",
+    "skill": {
+      "*": "allow"
+    },
+    "task": {
+      "*": "allow"
+    },
+    "doom_loop": "ask"
+  }
+}
