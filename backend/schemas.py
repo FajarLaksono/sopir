@@ -1,7 +1,8 @@
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
-from pydantic import BaseModel, Field, ConfigDict
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ScenarioBase(BaseModel):
@@ -81,6 +82,7 @@ class MetricsResponse(BaseModel):
     avg_speed: float
     speed_violations: int
     lane_deviations: int
+    ttc_per_step: Optional[list[Optional[float]]] = None
     computed_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

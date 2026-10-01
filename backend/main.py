@@ -1,9 +1,10 @@
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+from backend.api import failures, metrics, runs, scenarios
 from backend.database import Base, engine
-from backend.api import scenarios, runs, metrics, failures
-from backend.config import settings
 
 
 @asynccontextmanager

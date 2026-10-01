@@ -1,10 +1,12 @@
 from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func
+
 from backend.database import get_db
 from backend.models import Failure
-from backend.schemas import FailureResponse, FailureListResponse, ErrorResponse
+from backend.schemas import ErrorResponse, FailureListResponse, FailureResponse
 
 router = APIRouter()
 
@@ -23,16 +25,26 @@ def list_failures(
         query = query.where(Failure.severity == severity)
     if run_id:
         query = query.where(Failure.run_id == run_id)
-    total = db.scalar(select(func.count(Failure.id)).where(query.whereclause if query.whereclause is not None else True))
-    items = db.execute(
-        query.offset(offset).limit(page_size).order_by(Failure.created_at.desc())
-    ).scalars().all()
+    total = db.scalar(
+        select(func.count(Failure.id)).where(
+            query.whereclause if query.whereclause is not None else True
+        )
+    )
+    items = (
+        db.execute(query.offset(offset).limit(page_size).order_by(Failure.created_at.desc()))
+        .scalars()
+        .all()
+    )
     return FailureListResponse(items=items, total=total, page=page, page_size=page_size)
 
 
-@router.get("/{failure_id}", response_model=FailureResponse, responses={404: {"model": ErrorResponse}})
+@router.get(
+    "/{failure_id}", response_model=FailureResponse, responses={404: {"model": ErrorResponse}}
+)
 def get_failure(failure_id: UUID, db: Session = Depends(get_db)):
     failure = db.get(Failure, failure_id)
     if not failure:
-        raise HTTPException(status_code=404, detail="Failure not found", headers={"X-Error-Code": "NOT_FOUND"})
+        raise HTTPException(
+            status_code=404, detail="Failure not found", headers={"X-Error-Code": "NOT_FOUND"}
+        )
     return failure

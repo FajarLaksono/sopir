@@ -1,17 +1,17 @@
 import os
+import signal
 import sys
 import time
 import uuid
-import signal
 from datetime import datetime
 
 import traci
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
-from backend.models import SimulationRun, Telemetry
-from backend.config import settings
-from simulation.traci_client import sumo_connection
 
+from backend.config import settings
+from backend.models import SimulationRun, Telemetry
+from simulation.traci_client import sumo_connection
 
 POLL_INTERVAL = settings.poll_interval
 BATCH_SIZE = settings.telemetry_batch_size
@@ -67,16 +67,18 @@ def run_simulation(run: SimulationRun, db) -> None:
                     angle = traci.vehicle.getAngle(vid)
                     lane = traci.vehicle.getLaneID(vid)
 
-                    telemetry_batch.append(Telemetry(
-                        run_id=run.id,
-                        step=step,
-                        vehicle_id=vid,
-                        x=pos[0],
-                        y=pos[1],
-                        speed=speed,
-                        angle=angle,
-                        lane_id=lane,
-                    ))
+                    telemetry_batch.append(
+                        Telemetry(
+                            run_id=run.id,
+                            step=step,
+                            vehicle_id=vid,
+                            x=pos[0],
+                            y=pos[1],
+                            speed=speed,
+                            angle=angle,
+                            lane_id=lane,
+                        )
+                    )
 
                 if len(telemetry_batch) >= BATCH_SIZE:
                     db.bulk_save_objects(telemetry_batch)

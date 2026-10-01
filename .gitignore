@@ -3,6 +3,7 @@
 
 # Ignore the following files and directories
 Automated Driving Portfolio Guidance.pdf
+MyNote.txt
 
 # log files
 .coverage

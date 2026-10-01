@@ -1,8 +1,9 @@
 import os
 import sys
-import traci
 from contextlib import contextmanager
-from typing import Generator
+
+import traci
+
 from backend.config import settings
 
 

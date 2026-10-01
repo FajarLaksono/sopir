@@ -8,15 +8,15 @@ Usage:
     python spike_sumo.py --project PATH/TO/SUMO   # Run custom SUMO project
     python spike_sumo.py -p PATH/TO/SUMO          # Short form
 """
+
+import argparse
+import glob
 import os
 import sys
 import tempfile
 import time
-import argparse
-import glob
 
 import traci
-import sumolib
 
 
 def create_minimal_scenario(scenario_dir: str):
@@ -119,18 +119,22 @@ def run_spike(config_file: str, scenario_dir: str) -> bool:
                 speed = traci.vehicle.getSpeed(vid)
                 angle = traci.vehicle.getAngle(vid)
                 lane = traci.vehicle.getLaneID(vid)
-                vehicle_data.append({
-                    "step": step,
-                    "id": vid,
-                    "x": pos[0],
-                    "y": pos[1],
-                    "speed": speed,
-                    "angle": angle,
-                    "lane": lane
-                })
+                vehicle_data.append(
+                    {
+                        "step": step,
+                        "id": vid,
+                        "x": pos[0],
+                        "y": pos[1],
+                        "speed": speed,
+                        "angle": angle,
+                        "lane": lane,
+                    }
+                )
 
                 if step % 20 == 0:
-                    print(f"    Step {step:3d}: {vid} @ ({pos[0]:.1f}, {pos[1]:.1f}) speed={speed:.1f} lane={lane}")
+                    print(
+                        f"    Step {step:3d}: {vid} @ ({pos[0]:.1f}, {pos[1]:.1f}) speed={speed:.1f} lane={lane}"
+                    )
 
             # Collision detection API varies by SUMO/TraCI version
             # Skip for this spike - core connectivity verified
@@ -167,15 +171,14 @@ def main():
         description="SUMO TraCI Integration Spike - Test SUMO + TraCI connectivity"
     )
     parser.add_argument(
-        "--project", "-p",
-        type=str,
-        help="Path to SUMO project directory containing .sumocfg file"
+        "--project", "-p", type=str, help="Path to SUMO project directory containing .sumocfg file"
     )
     parser.add_argument(
-        "--steps", "-s",
+        "--steps",
+        "-s",
         type=int,
         default=100,
-        help="Number of simulation steps to run (default: 100)"
+        help="Number of simulation steps to run (default: 100)",
     )
     args = parser.parse_args()
 
@@ -207,6 +210,7 @@ def main():
         time.sleep(0.5)
         try:
             import shutil
+
             shutil.rmtree(scenario_dir, ignore_errors=True)
         except Exception:
             pass

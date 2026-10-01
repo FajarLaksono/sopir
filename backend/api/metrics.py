@@ -68,6 +68,7 @@ def evaluate_run(
         avg_speed=metrics_dict.get("avg_speed", 0.0),
         speed_violations=metrics_dict.get("speed_violations", 0),
         lane_deviations=metrics_dict.get("lane_deviations", 0),
+        ttc_per_step=metrics_dict.get("ttc_per_step", []),
     )
     metrics_obj = db.merge(metrics_obj)
 

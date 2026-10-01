@@ -1,10 +1,10 @@
 import streamlit as st
-import pandas as pd
-from sqlalchemy import create_engine, select, func
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
-from backend.models import Scenario, SimulationRun, Metrics, Failure
-from backend.config import settings
 
+from backend.config import settings
+from backend.models import Failure, Metrics, Scenario, SimulationRun
+from dashboard.components import render_failure_list, render_metric_charts, render_run_table
 
 st.set_page_config(page_title="OpenDriveLab Dashboard", layout="wide")
 
@@ -16,7 +16,11 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 def load_runs():
     db = SessionLocal()
     try:
-        runs = db.execute(select(SimulationRun).order_by(SimulationRun.created_at.desc())).scalars().all()
+        runs = (
+            db.execute(select(SimulationRun).order_by(SimulationRun.created_at.desc()))
+            .scalars()
+            .all()
+        )
         return runs
     finally:
         db.close()
@@ -72,46 +76,14 @@ run_ids = [r.id for r in runs]
 metrics_map = load_metrics(run_ids)
 failures_map = load_failures(run_ids)
 
-st.subheader("Runs Overview")
+# Build runs map for failure list
+runs_map = {r.id: r for r in runs}
 
-run_data = []
-for r in runs:
-    scenario = scenario_map.get(r.scenario_id)
-    m = metrics_map.get(r.id)
-    f = failures_map.get(r.id, [])
-    critical_failures = sum(1 for ff in f if ff.severity == "critical")
+# Render components
+render_run_table(runs, metrics_map, failures_map, scenario_map)
 
-    run_data.append({
-        "Run ID": str(r.id)[:8],
-        "Scenario": scenario.type if scenario else "Unknown",
-        "Status": r.status,
-        "Started": r.started_at.strftime("%H:%M:%S") if r.started_at else "-",
-        "Completed": r.completed_at.strftime("%H:%M:%S") if r.completed_at else "-",
-        "Collisions": m.collision_count if m else "-",
-        "Min TTC (s)": f"{m.min_ttc:.2f}" if m and m.min_ttc else "-",
-        "Avg Speed": f"{m.avg_speed:.1f}" if m else "-",
-        "Failures": len(f),
-        "Critical": critical_failures,
-    })
+st.markdown("---")
+render_metric_charts(runs, metrics_map, scenario_map)
 
-df = pd.DataFrame(run_data)
-st.dataframe(df, use_container_width=True, hide_index=True)
-
-st.subheader("Failure Details")
-all_failures = []
-for f_list in failures_map.values():
-    all_failures.extend(f_list)
-
-if all_failures:
-    failure_data = []
-    for f in all_failures:
-        failure_data.append({
-            "Run ID": str(f.run_id)[:8],
-            "Severity": f.severity,
-            "Rule": f.rule,
-            "Details": str(f.details),
-            "Created": f.created_at.strftime("%H:%M:%S"),
-        })
-    st.dataframe(pd.DataFrame(failure_data), use_container_width=True, hide_index=True)
-else:
-    st.info("No failures detected yet.")
+st.markdown("---")
+render_failure_list(failures_map, runs_map)

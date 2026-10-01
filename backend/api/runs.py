@@ -1,24 +1,37 @@
-from uuid import UUID
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func
+
 from backend.database import get_db
 from backend.models import SimulationRun, Telemetry
 from backend.schemas import (
-    SimulationRunCreate, SimulationRunResponse, SimulationRunListResponse,
-    TelemetryBatch, TelemetryRecord, ErrorResponse
+    ErrorResponse,
+    SimulationRunCreate,
+    SimulationRunListResponse,
+    SimulationRunResponse,
+    TelemetryBatch,
 )
 
 router = APIRouter()
 
 
-@router.post("", response_model=SimulationRunResponse, status_code=201, responses={400: {"model": ErrorResponse}, 404: {"model": ErrorResponse}})
+@router.post(
+    "",
+    response_model=SimulationRunResponse,
+    status_code=201,
+    responses={400: {"model": ErrorResponse}, 404: {"model": ErrorResponse}},
+)
 def create_run(payload: SimulationRunCreate, db: Session = Depends(get_db)):
     from backend.models import Scenario
+
     scenario = db.get(Scenario, payload.scenario_id)
     if not scenario:
-        raise HTTPException(status_code=404, detail="Scenario not found", headers={"X-Error-Code": "NOT_FOUND"})
+        raise HTTPException(
+            status_code=404, detail="Scenario not found", headers={"X-Error-Code": "NOT_FOUND"}
+        )
     run = SimulationRun(scenario_id=payload.scenario_id)
     db.add(run)
     db.commit()
@@ -37,18 +50,28 @@ def list_runs(
     query = select(SimulationRun)
     if status:
         query = query.where(SimulationRun.status == status)
-    total = db.scalar(select(func.count(SimulationRun.id)).where(query.whereclause if query.whereclause is not None else True))
-    items = db.execute(
-        query.offset(offset).limit(page_size).order_by(SimulationRun.created_at.desc())
-    ).scalars().all()
+    total = db.scalar(
+        select(func.count(SimulationRun.id)).where(
+            query.whereclause if query.whereclause is not None else True
+        )
+    )
+    items = (
+        db.execute(query.offset(offset).limit(page_size).order_by(SimulationRun.created_at.desc()))
+        .scalars()
+        .all()
+    )
     return SimulationRunListResponse(items=items, total=total, page=page, page_size=page_size)
 
 
-@router.get("/{run_id}", response_model=SimulationRunResponse, responses={404: {"model": ErrorResponse}})
+@router.get(
+    "/{run_id}", response_model=SimulationRunResponse, responses={404: {"model": ErrorResponse}}
+)
 def get_run(run_id: UUID, db: Session = Depends(get_db)):
     run = db.get(SimulationRun, run_id)
     if not run:
-        raise HTTPException(status_code=404, detail="Run not found", headers={"X-Error-Code": "NOT_FOUND"})
+        raise HTTPException(
+            status_code=404, detail="Run not found", headers={"X-Error-Code": "NOT_FOUND"}
+        )
     return run
 
 
@@ -56,7 +79,9 @@ def get_run(run_id: UUID, db: Session = Depends(get_db)):
 def ingest_telemetry(run_id: UUID, payload: TelemetryBatch, db: Session = Depends(get_db)):
     run = db.get(SimulationRun, run_id)
     if not run:
-        raise HTTPException(status_code=404, detail="Run not found", headers={"X-Error-Code": "NOT_FOUND"})
+        raise HTTPException(
+            status_code=404, detail="Run not found", headers={"X-Error-Code": "NOT_FOUND"}
+        )
 
     records = [
         Telemetry(
@@ -76,11 +101,19 @@ def ingest_telemetry(run_id: UUID, payload: TelemetryBatch, db: Session = Depend
     return {"ingested": len(records)}
 
 
-@router.patch("/{run_id}/status", response_model=SimulationRunResponse, responses={404: {"model": ErrorResponse}})
-def update_run_status(run_id: UUID, status: str, worker_id: str | None = None, db: Session = Depends(get_db)):
+@router.patch(
+    "/{run_id}/status",
+    response_model=SimulationRunResponse,
+    responses={404: {"model": ErrorResponse}},
+)
+def update_run_status(
+    run_id: UUID, status: str, worker_id: str | None = None, db: Session = Depends(get_db)
+):
     run = db.get(SimulationRun, run_id)
     if not run:
-        raise HTTPException(status_code=404, detail="Run not found", headers={"X-Error-Code": "NOT_FOUND"})
+        raise HTTPException(
+            status_code=404, detail="Run not found", headers={"X-Error-Code": "NOT_FOUND"}
+        )
     run.status = status
     if worker_id:
         run.worker_id = worker_id

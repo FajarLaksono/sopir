@@ -8,14 +8,29 @@ A cloud-native platform for AD/ADAS validation that systematically generates sce
 
 ## Architecture Overview
 
+```mermaid
+graph TB
+    subgraph "Docker Compose"
+        DB[(PostgreSQL)]
+        API[FastAPI Backend]
+        GEN[Scenario Generator]
+        WKR[Simulation Workers xN]
+        DASH[Streamlit Dashboard]
+    end
+
+    API --> DB
+    GEN --> DB
+    GEN --> VOL[Shared Volume]
+    WKR --> DB
+    WKR --> VOL
+    WKR --> SUMO[(SUMO Headless)]
+    DASH --> DB
+    API --> WKR
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      Docker Compose                          │
-├─────────────┬─────────────┬─────────────┬───────────────────┤
-│  PostgreSQL │  Backend    │  Worker     │  Dashboard        │
-│  (Data)     │  (FastAPI)  │  (SUMO)     │  (Streamlit)      │
-└─────────────┴─────────────┴─────────────┴───────────────────┘
-```
+
+**Services**: PostgreSQL • FastAPI • Scenario Generator • SUMO Workers (×N) • Streamlit Dashboard
+
+[Full Architecture Documentation →](docs/architecture.md)
 
 ---
 
@@ -26,77 +41,61 @@ A cloud-native platform for AD/ADAS validation that systematically generates sce
 - Python 3.10+ (for local development)
 - SUMO 1.27+ (for local testing)
 
-### Local Development Setup
+### Full Platform (Docker Compose)
 
 ```bash
 # 1. Clone and setup
 cd sopir
 cp .env.example .env  # Edit if needed
 
-# 2. Install Python dependencies
-pip install -r requirements.txt
-
-# 3. Run SUMO TraCI integration spike (validates SUMO + TraCI)
-python spike_sumo.py                    # Minimal generated test
-python spike_sumo.py --project /path/to/your/sumo/project  # Your custom project
-```
-
-### Docker Spike Test
-
-```bash
-# Build and run spike in Docker (uses the official Eclipse SUMO image)
-docker build -f Dockerfile.sumo -t sumo-spike .
-docker run --rm sumo-spike                           # Minimal test
-docker run --rm -v /host/path/to/project:/data sumo-spike --project /data  # Your project
-
-# On Windows (PowerShell), use forward slashes and quote the mount:
-docker run --rm -v "D:/path/to/project:/data" sumo-spike --project /data
-```
-
-### Full Platform (After Day 1-5 Implementation)
-
-```bash
-# 1. Start all services
+# 2. Start all services
 docker compose up --build -d
 
-# 2. Generate scenarios (creates 4 scenario types)
+# 3. Generate scenarios (creates 4 scenario types)
 docker compose exec backend python -m scenario_gen.cli generate
 
-# 3. Start workers (scale for parallel simulation)
+# 4. Start workers (scale for parallel simulation)
 docker compose up --scale worker=3 -d
 
-# 4. Create a simulation run (pick a scenario_id from step 2)
-SCENARIO_ID=$(curl -s http://localhost:8000/api/v1/scenarios | jq -r '.items[0].id')
-curl -X POST http://localhost:8000/api/v1/runs \
-  -H "Content-Type: application/json" \
-  -d "{\"scenario_id\": \"$SCENARIO_ID\"}"
+# 5. Create simulation runs (one per scenario type)
+SCENARIO_IDS=$(curl -s http://localhost:8000/api/v1/scenarios | jq -r '.items[].id')
+for SID in $SCENARIO_IDS; do
+  curl -X POST http://localhost:8000/api/v1/runs \
+    -H "Content-Type: application/json" \
+    -d "{\"scenario_id\": \"$SID\"}"
+done
 
-# 5. Wait for worker to complete (check logs), then evaluate
-RUN_ID=<run_id_from_step_4_response>
-curl -X POST http://localhost:8000/api/v1/metrics/runs/$RUN_ID/evaluate
+# 6. Wait 30-60s for workers to complete, then evaluate all runs
+RUN_IDS=$(curl -s http://localhost:8000/api/v1/runs | jq -r '.items[].id')
+for RID in $RUN_IDS; do
+  curl -X POST http://localhost:8000/api/v1/metrics/runs/$RID/evaluate
+done
 
-# 6. Open dashboard
+# 7. Open dashboard
 open http://localhost:8501
 ```
 
-### Quick Test (All-in-One)
-```bash
-# After docker compose up --build -d and scenario generation:
-SCENARIO_ID=$(curl -s http://localhost:8000/api/v1/scenarios | jq -r '.items[0].id')
-RUN_ID=$(curl -s -X POST http://localhost:8000/api/v1/runs \
-  -H "Content-Type: application/json" \
-  -d "{\"scenario_id\": \"$SCENARIO_ID\"}" | jq -r '.id')
-echo "Run created: $RUN_ID"
+### Local Development Setup
 
-# Wait 30-60s for worker to complete simulation, then:
-curl -X POST http://localhost:8000/api/v1/metrics/runs/$RUN_ID/evaluate
+```bash
+# Install Python dependencies
+pip install -r requirements.txt
+
+# Run SUMO TraCI integration spike (validates SUMO + TraCI)
+python spike_sumo.py                    # Minimal generated test
+python spike_sumo.py --project /path/to/your/sumo/project  # Your custom project
+
+# Run tests
+pytest tests/ -v
+
+# Lint & format
+ruff check . && ruff format .
 ```
 
 ---
 
 ## SUMO TraCI Integration Spike
 
-### Purpose
 Validates that SUMO and TraCI can communicate properly before building the full platform.
 
 ### Run Locally (Windows)
@@ -125,16 +124,6 @@ docker run --rm sumo-spike
 # Your project (volume mount)
 docker run --rm -v "D:/Projects/MySUMOProject:/data" sumo-spike --project /data
 ```
-
-### SUMO Versions
-
-The image is pinned to `ghcr.io/eclipse-sumo/sumo:1.27.1`, matching the local SUMO install and the `traci`/`sumolib` pins in `requirements.txt`. Keep these in lockstep: a scenario written by a current netedit can use flow attributes that older binaries reject outright. `perHour` is the clearest example - it is documented in the current spec and is what netedit emits by default, but a 2019 SUMO build does not recognise it and fails the run with `At least one of 'period', 'vehsPerHour', 'probability', and 'number' is needed in flow`.
-
-TraCI and `sumolib` are **not** pip-installed in the image. They are taken from `$SUMO_HOME/tools` in the base image, built from the same source tree as the `sumo` binary, so the TraCI client and server cannot drift apart. The `traci==1.27.1` / `sumolib==1.27.1` entries in `requirements.txt` describe the local Windows environment only.
-
-The base image already sets `SUMO_HOME=/usr/share/sumo`; the `PYTHONPATH` in `Dockerfile.sumo` is what makes `$SUMO_HOME/tools` importable.
-
-> Note: the commonly referenced `dlrts/sumo` Docker Hub image is abandoned. Its single `latest` tag was last pushed in June 2019 (SUMO 1.5.0) and cannot load scenarios produced by current netedit.
 
 ### Expected Output (Success)
 
@@ -168,43 +157,6 @@ SPIKE RESULT: SUCCESS
 ============================================================
 ```
 
-### Expected Output (`--project`)
-
-With `--project DIR` no scenario is generated; the spike runs your `.sumocfg` directly, so step `[1/5]` and the vehicle IDs differ:
-
-```
-[INFO] Found config: /data/Simple-traffic.sumocfg
-============================================================
-SUMO TraCI Integration Spike
-============================================================
-
-[1/5] Using scenario: /data/Simple-traffic.sumocfg
-    Scenario dir: /data
-
-[2/5] Starting SUMO headless via TraCI
-    Command: sumo -c /data/Simple-traffic.sumocfg
-    [OK] SUMO started successfully
-
-[3/5] Running simulation loop (100 steps)
-    Step   0: f_0.0 @ (-694.9, -1.6) speed=13.9 lane=-E22_2
-    Step  20: f_0.0 @ (-498.4, 57.5) speed=13.5 lane=-E13_0
-    ...
-
-[4/5] Checking results
-    Total vehicle readings: ~1300
-    Unique vehicles seen: {'f_0.0', 'f_0.1', ...}
-    Collision detection: SKIPPED (TraCI version specific)
-
-[5/5] Shutting down SUMO
-    [OK] Clean shutdown
-
-============================================================
-SPIKE RESULT: SUCCESS
-============================================================
-```
-
-The reading count is driven by the flow rate in your route file; `assets/SUMO` uses 1800 veh/h, which yields ~46 vehicles across the 100 steps.
-
 ---
 
 ## Project Structure
@@ -213,11 +165,25 @@ The reading count is driven by the flow rate in your route file; `assets/SUMO` u
 sopir/
 ├── docker-compose.yml           # Service orchestration
 ├── Dockerfile.sumo              # SUMO spike image
+├── Dockerfile.backend           # Backend image
+├── Dockerfile.worker            # Worker image (SUMO base)
+├── Dockerfile.dashboard         # Dashboard image
 ├── spike_sumo.py                # TraCI integration test
 ├── requirements.txt             # Python dependencies
+├── pyproject.toml               # Ruff config
 ├── .env.example                 # Environment template
+├── .env                         # Local env (gitignored)
 ├── PLANNING.md                  # Implementation roadmap
 ├── AGENTS.md                    # AI agent guidelines
+├── alembic.ini                  # Alembic config
+├── alembic/                     # DB migrations
+│   ├── env.py
+│   ├── script.py.mako
+│   └── versions/
+│       ├── 0001_initial_schema.py
+│       └── 0002_ttc_per_step.py
+├── docs/
+│   └── architecture.md          # Architecture documentation
 ├── backend/                     # FastAPI backend
 │   ├── main.py                  # App entry point
 │   ├── config.py                # Pydantic settings
@@ -225,23 +191,63 @@ sopir/
 │   ├── models.py                # ORM models
 │   ├── schemas.py               # Pydantic schemas
 │   └── api/                     # REST endpoints
+│       ├── __init__.py
+│       ├── scenarios.py
+│       ├── runs.py
+│       ├── metrics.py
+│       └── failures.py
 ├── scenario_gen/                # Scenario generator
-│   ├── generator.py
+│   ├── __init__.py
 │   ├── cli.py
-│   ├── templates/               # .net.xml templates
-│   └── configs/                 # Scenario YAML configs
+│   ├── templates/               # .net.xml, .rou.xml, .sumocfg templates
+│   │   ├── intersection.net.xml
+│   │   ├── intersection.rou.xml
+│   │   ├── intersection.sumocfg
+│   │   ├── highway_merge.net.xml
+│   │   ├── highway_merge.rou.xml
+│   │   ├── highway_merge.sumocfg
+│   │   ├── pedestrian_crossing.net.xml
+│   │   ├── pedestrian_crossing.rou.xml
+│   │   ├── pedestrian_crossing.sumocfg
+│   │   ├── lane_change.net.xml
+│   │   ├── lane_change.rou.xml
+│   │   └── lane_change.sumocfg
+│   └── nodoc/                   # Template source files
 ├── simulation/                  # SUMO worker
+│   ├── __init__.py
 │   ├── worker.py
 │   ├── traci_client.py
 │   └── telemetry.py
 ├── evaluation/                  # Metrics & failure detection
+│   ├── __init__.py
 │   ├── metrics.py
 │   └── failure_detector.py
 ├── dashboard/                   # Streamlit dashboard
 │   ├── app.py
 │   └── components/
+│       ├── __init__.py
+│       ├── run_table.py
+│       ├── metric_charts.py
+│       └── failure_list.py
 └── tests/                       # Unit tests
+    ├── __init__.py
+    ├── conftest.py              # Shared fixtures
+    ├── test_metrics.py
+    ├── test_failure_detector.py
+    ├── test_scenario_generation.py
+    └── test_evaluate_endpoint.py
 ```
+
+---
+
+## Scenario Types
+
+| Type | Description | Key Challenge |
+|------|-------------|---------------|
+| `intersection` | 4-way priority intersection, conflicting left/through traffic | Right-of-way, crossing paths |
+| `highway_merge` | 3-lane highway with low-priority on-ramp | Merge gap acceptance |
+| `pedestrian_crossing` | Two-lane road with footway and marked crossing | Pedestrian detection, yield |
+| `lane_change` | Two congested lanes vs one free lane | Overtake, lane discipline |
 
 ---
 
@@ -253,6 +259,50 @@ sopir/
 | `SUMO_HOME` | SUMO installation path | Auto-detected |
 | `POLL_INTERVAL` | Worker poll interval (seconds) | `5` |
 | `TELEMETRY_BATCH_SIZE` | Telemetry batch insert size | `100` |
+| `SCENARIO_DATA_DIR` | Shared volume for artifacts | `/data/scenarios` |
+| `SCENARIO_TEMPLATES_DIR` | Template directory | `/app/scenario_gen/templates` |
+
+---
+
+## API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/scenarios/generate` | Generate 4 scenario types |
+| `GET` | `/api/v1/scenarios` | List scenarios (paginated) |
+| `POST` | `/api/v1/runs` | Create simulation run |
+| `GET` | `/api/v1/runs` | List runs (filter by status) |
+| `POST` | `/api/v1/runs/{id}/telemetry` | Ingest telemetry batch |
+| `PATCH` | `/api/v1/runs/{id}/status` | Update run status |
+| `POST` | `/api/v1/metrics/runs/{id}/evaluate` | Compute metrics + detect failures |
+| `GET` | `/api/v1/metrics/runs/{id}` | Get metrics for run |
+| `GET` | `/api/v1/failures` | List failures (filter by severity/run) |
+
+Interactive API docs: `http://localhost:8000/docs`
+
+---
+
+## Failure Detection Rules
+
+| Severity | Rule | Threshold |
+|----------|------|-----------|
+| Critical | `collision` | `collision_count > 0` |
+| High | `min_ttc_lt_1s` | `min_ttc < 1.0s` |
+| Medium | `speed_violations_gt_10` | `speed_violations > 10` |
+| Medium | `lane_deviations_gt_5` | `lane_deviations > 5` |
+
+---
+
+## Metrics Computed
+
+| Metric | Description |
+|--------|-------------|
+| `collision_count` | Vehicle pairs within 2.5m at same timestep |
+| `min_ttc` | Minimum time-to-collision across all pairs/steps |
+| `avg_speed` | Mean speed across all vehicles/steps |
+| `speed_violations` | Timesteps where any vehicle > 15 m/s |
+| `lane_deviations` | Lane changes per vehicle |
+| `ttc_per_step` | Min TTC per simulation step (for trend chart) |
 
 ---
 
@@ -282,21 +332,25 @@ docker compose up --build -d
 
 ---
 
+## Demo Script (for Interviews)
+
+```bash
+# 1. Show architecture diagram in README
+# 2. Generate scenarios
+docker compose exec backend python -m scenario_gen.cli generate
+
+# 3. Run parallel simulations
+docker compose up --scale worker=3 -d
+
+# 4. Show live dashboard
+open http://localhost:8501
+# - Runs table updating in real-time
+# - Failure detection working
+# - Metric comparison across scenarios
+```
+
+---
+
 ## License
 
 MIT License - Portfolio project for Woven by Toyota application.
-
-
-# 1. Start workers (scale for parallel)
-docker compose up --scale worker=3 -d
-
-# 2. Create a run (pick a scenario_id from the list above)
-curl -X POST http://localhost:8000/api/v1/runs \
-  -H "Content-Type: application/json" \
-  -d '{"scenario_id": "71e09fd8-bea8-4baa-8eda-0bb16f0ebb54"}'
-
-# 3. Wait ~30-60s for worker to complete, then evaluate
-curl -X POST http://localhost:8000/api/v1/metrics/runs/{run_id}/evaluate
-
-# 4. View results
-open http://localhost:8501
