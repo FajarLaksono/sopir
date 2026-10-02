@@ -1,0 +1,17 @@
+{
+  "type": "record",
+  "name": "VehicleCanSignal",
+  "namespace": "sopir.veh",
+  "fields": [
+    { "name": "schema_version", "type": "string", "default": "1.0.0" },
+    { "name": "event_id", "type": "string" },
+    { "name": "vehicle_id", "type": "string" },
+    { "name": "captured_at", "type": "long", "logicalType": "timestamp-millis" },
+    { "name": "run_id", "type": ["null", "string"], "default": null },
+    { "name": "rpm", "type": "double" },
+    { "name": "wheel_speed", "type": "double" },
+    { "name": "brake_pressure", "type": "double" },
+    { "name": "steering_angle", "type": "double" },
+    { "name": "battery_soc", "type": ["null", "double"], "default": null }
+  ]
+}

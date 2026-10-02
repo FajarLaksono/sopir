@@ -1,0 +1,13 @@
+# One-shot image for pipeline initialization (schema registration).
+#
+# Deliberately minimal: only the two directories register_schemas.py needs.
+# Dockerfile.backend is the wrong base to reuse here because it ships the whole
+# application for a script that runs once and exits.
+FROM sopir-base:latest
+
+WORKDIR /app
+
+COPY scripts ./scripts
+COPY schemas ./schemas
+
+CMD ["python", "scripts/register_schemas.py"]

@@ -1,0 +1,160 @@
+name: CI
+
+# The fast tier. Everything here runs on every push to every branch and finishes
+# in a few minutes. The heavy streaming stack (Redpanda, LocalStack, a live
+# producer/consumer restart) lives in ci-integration.yml and only runs on main.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  lint:
+    name: Lint and format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      # Pinned to match requirements.txt rather than floating, so a new Ruff
+      # release cannot fail the build on style changes nobody reviewed.
+      - name: Install linters
+        run: pip install ruff==0.1.15
+
+      - name: Ruff check
+        run: ruff check .
+
+      - name: Ruff format
+        run: ruff format --check .
+
+  types:
+    name: Type check (non-blocking)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install mypy
+        run: pip install mypy==1.7.1
+
+      # Deliberately not gating yet. The suite is not annotated to strict mode
+      # and the exclusions in pyproject.toml still cover streaming/ and
+      # dashboard/, so this step establishes a baseline to ratchet against
+      # rather than a definition of done. It is wired up now so the baseline
+      # exists from the first commit instead of being reconstructed later.
+      #
+      # The target list deliberately omits streaming/ and dashboard/, matching
+      # the `exclude` in pyproject.toml. Naming an excluded directory on the
+      # command line does not check it -- mypy prints "There are no .py[i] files
+      # in directory 'streaming'" and exits 2, having type-checked nothing at
+      # all. That would leave this step green while producing no baseline, which
+      # is the one outcome worse than not having the step.
+      #
+      # Current baseline: 12 errors in 5 files, 21 source files checked. Ratchet
+      # this number down; do not raise it.
+      - name: Mypy
+        run: mypy backend/ evaluation/ scenario_gen/ simulation/
+
+  unit:
+    name: Unit and contract tests
+    runs-on: ubuntu-latest
+
+    # The full suite, because the DB-backed tests are the ones that catch model
+    # and observability regressions and they only take ~10s once Postgres is up.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: opendrivelab
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/opendrivelab
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      # The tests import confluent_kafka, pyarrow, boto3 and fastavro, none of
+      # which are on PyPI for every platform combination. Rather than maintain a
+      # second requirements file that could drift, the suite runs inside the
+      # image it is meant to describe, with the source bind-mounted on top.
+      #
+      # The mount is what makes this trustworthy: the images copy the source in
+      # at build time, so running `pytest` in a plain built image would test
+      # whatever was baked in rather than the commit being checked.
+      - name: Build the base image
+        run: docker build -f Dockerfile.base -t sopir-base:ci .
+
+      - name: Run the test suite
+        run: |
+          docker run --rm \
+            --network host \
+            -v "$PWD:/src" \
+            -w /src \
+            -e DATABASE_URL \
+            sopir-base:ci \
+            python -m pytest -v
+
+  compose:
+    name: Compose and alert rules are valid
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copy the example env
+        run: cp .env.example .env
+
+      # A malformed compose file or a syntactically invalid PromQL expression
+      # would otherwise only surface on someone's machine at `docker compose up`.
+      - name: Validate docker-compose.yml
+        run: docker compose config --quiet
+
+      # The integration stack is a separate file, and it is what ci-integration.yml
+      # builds. Validating only the main stack would let a typo in the test one
+      # break the heavy workflow rather than being caught by the fast tier that
+      # exists to catch exactly this kind of thing.
+      - name: Validate docker-compose.test.yml
+        run: docker compose -f docker-compose.test.yml config --quiet
+
+      - name: Validate alert rules
+        run: |
+          docker run --rm \
+            -v "$PWD/infra:/etc/prometheus:ro" \
+            --entrypoint promtool \
+            prom/prometheus:v2.53.0 \
+            check rules /etc/prometheus/prometheus-rules.yml
+
+      - name: Validate prometheus.yml
+        run: |
+          docker run --rm \
+            -v "$PWD/infra:/etc/prometheus:ro" \
+            --entrypoint promtool \
+            prom/prometheus:v2.53.0 \
+            check config /etc/prometheus/prometheus.yml

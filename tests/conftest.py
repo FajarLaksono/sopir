@@ -2,9 +2,59 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 import pytest
+
+
+def _database_reachable() -> bool:
+    """True when a Postgres is actually there, without raising."""
+    url = os.getenv("DATABASE_URL")
+    if not url:
+        return False
+    try:
+        from sqlalchemy import create_engine
+
+        engine = create_engine(url, pool_pre_ping=True, connect_args={"connect_timeout": 3})
+        try:
+            with engine.connect() as connection:
+                connection.exec_driver_sql("SELECT 1")
+        finally:
+            engine.dispose()
+    except Exception:
+        return False
+    return True
+
+
+@pytest.fixture(scope="session", autouse=True)
+def database_schema():
+    """Create the SQLAlchemy tables once per session, if a database exists.
+
+    This used to happen by accident: ``tests/test_backend_observability.py``
+    enters the FastAPI lifespan, which calls ``create_all``, and because that
+    file sorts before ``test_processor.py`` alphabetically the tables happened to
+    be there by the time the processor tests ran. Run the processor tests alone
+    against an empty database and every one of them errored on a missing table.
+
+    Making it explicit here means the suite does not depend on collection order,
+    and it degrades to a no-op when ``DATABASE_URL`` is unset or unreachable --
+    which is what lets the fast CI tier run the pure unit tests with no database
+    at all.
+    """
+    if not _database_reachable():
+        yield None
+        return
+
+    from backend.database import Base, engine
+
+    # create_all only, never drop_all: DATABASE_URL may well be pointing at a
+    # developer's local compose Postgres holding real scenarios and runs, and a
+    # teardown that dropped every table would destroy it. create_all is
+    # idempotent, so leaving the schema in place costs nothing and the next run
+    # still gets what it needs.
+    Base.metadata.create_all(bind=engine)
+    yield engine
 
 
 @pytest.fixture

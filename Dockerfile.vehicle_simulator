@@ -1,0 +1,13 @@
+FROM sopir-base:latest
+
+WORKDIR /app
+
+COPY vehicle_simulator/ ./vehicle_simulator/
+COPY streaming/ ./streaming/
+COPY schemas/ ./schemas/
+COPY backend/ ./backend/
+COPY simulation/ ./simulation/
+
+ENV PYTHONPATH=/app
+
+CMD ["python", "-m", "vehicle_simulator.cli"]

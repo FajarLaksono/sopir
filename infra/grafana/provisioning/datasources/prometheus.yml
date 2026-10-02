@@ -1,0 +1,14 @@
+apiVersion: 1
+
+# Provisioned so a fresh `docker compose up` lands on a working dashboard with
+# no clicking. Anonymous access is enabled because this is a local-only stack
+# with no secrets in it; a deployed instance would authenticate here.
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: 10s

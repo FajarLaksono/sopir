@@ -1,0 +1,392 @@
+{
+  "uid": "sopir-pipeline",
+  "title": "Sopir Pipeline Overview",
+  "tags": ["sopir", "streaming"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "editable": true,
+  "time": { "from": "now-30m", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "label": "Service",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": "label_values(sopir_service_up, service)",
+        "includeAll": true,
+        "multi": true,
+        "current": { "text": "All", "value": "$__all" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Health",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+    {
+      "type": "stat",
+      "title": "Service Up",
+      "description": "1 while a service's main loop is turning. 0 means it is wedged, not merely idle.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 4, "x": 0, "y": 1 },
+      "targets": [
+        {
+          "expr": "sopir_service_up{service=~\"$service\"}",
+          "legendFormat": "{{instance}}"
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "DOWN", "color": "red", "index": 0 }, "1": { "text": "UP", "color": "green", "index": 1 } } }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Ready",
+      "description": "1 when every dependency check passes.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 4, "x": 4, "y": 1 },
+      "targets": [
+        { "expr": "sopir_service_ready{service=~\"$service\"}", "legendFormat": "{{instance}}" }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "NOT READY", "color": "red", "index": 0 }, "1": { "text": "READY", "color": "green", "index": 1 } } }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Dead-Lettered (total)",
+      "description": "Records routed to sopir.dlq.v1. Any sustained rise means data is being dropped from the happy path and needs investigating.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 4, "x": 8, "y": 1 },
+      "targets": [
+        { "expr": "sum(sopir_dlq_routed_total{service=~\"$service\"})", "legendFormat": "total" }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 1 }] }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Errors (total)",
+      "description": "sink_write, db, and processing errors. A non-zero value with zero progress means a stuck loop.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 4, "x": 12, "y": 1 },
+      "targets": [
+        { "expr": "sum(sopir_errors_total{service=~\"$service\"})", "legendFormat": "total" }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Total Consumer Lag",
+      "description": "Records between each group's committed offset and the high watermark. Rising lag means a consumer cannot keep up.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 4, "x": 16, "y": 1 },
+      "targets": [
+        { "expr": "sum(sopir_consumer_lag{service=~\"$service\"})", "legendFormat": "records" }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 1000 }] }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Open Windows",
+      "description": "Processor windows held in memory. Climbing without falling means windows are not closing.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 4, "x": 20, "y": 1 },
+      "targets": [
+        { "expr": "sum(sopir_open_windows{service=~\"$service\"})", "legendFormat": "windows" }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 50 }] }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "row",
+      "title": "Throughput",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Records Consumed (per second)",
+      "description": "Rate of records read from Kafka, by service and topic.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 7 },
+      "targets": [
+        {
+          "expr": "sum by (service, topic) (rate(sopir_records_consumed_total{service=~\"$service\"}[1m]))",
+          "legendFormat": "{{service}} / {{topic}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 8 }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Records Written (per second)",
+      "description": "Durable writes by destination kind: parquet_records, stream_metrics, stream_events, telemetry.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 7 },
+      "targets": [
+        {
+          "expr": "sum by (service, kind) (rate(sopir_records_written_total{service=~\"$service\"}[1m]))",
+          "legendFormat": "{{service}} / {{kind}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 8 }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Dead-Letter Rate (per second)",
+      "description": "Short-term DLQ rate by error stage. A spike localizes the failure: deserialization means a schema mismatch, sink_write means the store is refusing writes.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
+      "targets": [
+        {
+          "expr": "sum by (service, stage) (rate(sopir_dlq_routed_total{service=~\"$service\"}[1m]))",
+          "legendFormat": "{{service}} / {{stage}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 8 }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP Requests (per second)",
+      "description": "Requests served by the backend, by normalized route. Separated from stream throughput so neither sum() mixes the two.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 23 },
+      "targets": [
+        {
+          "expr": "sum by (method, route) (rate(sopir_http_requests_total{service=\"backend\"}[1m]))",
+          "legendFormat": "{{method}} {{route}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 8 }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Simulation Runs Completed (per minute)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
+      "targets": [
+        {
+          "expr": "sum by (outcome) (rate(sopir_runs_total{service=\"worker\"}[1m]))",
+          "legendFormat": "{{outcome}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 8 }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "row",
+      "title": "Lag",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Consumer Lag by Topic",
+      "description": "Per-partition lag. Sum across partitions of a topic to see total backlog.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 32 },
+      "targets": [
+        {
+          "expr": "sum by (service, group, topic) (sopir_consumer_lag{service=~\"$service\"})",
+          "legendFormat": "{{service}} / {{group}} / {{topic}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 5, "stacking": { "mode": "normal" } }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "row",
+      "title": "Buffering",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 41 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Pending Events (unflushed)",
+      "description": "Vehicle records buffered in memory before the next flush. A plateau at the batch size means flushes have stalled.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 42 },
+      "targets": [
+        {
+          "expr": "sum by (service) (sopir_pending_events{service=~\"$service\"})",
+          "legendFormat": "{{service}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 8 }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Time Since Last Progress",
+      "description": "Seconds since the last durable write. Flat means the service is running but not advancing, which is the signature of a stuck consumer.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 42 },
+      "targets": [
+        {
+          "expr": "time() - sopir_last_progress_timestamp_seconds{service=~\"$service\"}",
+          "legendFormat": "{{service}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 8 }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Batch Size Distribution (p50 / p95)",
+      "description": "How many records land per flush. p95 near the configured batch size means size-triggered flushing dominates; a low p95 with high throughput means the interval is doing the work.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 50 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.5, sum by (le, service) (rate(sopir_batch_records_bucket{service=~\"$service\"}[5m])))",
+          "legendFormat": "p50 {{service}}"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, service) (rate(sopir_batch_records_bucket{service=~\"$service\"}[5m])))",
+          "legendFormat": "p95 {{service}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 0 }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Simulation Run Duration (p50 / p95)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 50 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(sopir_run_duration_seconds_bucket{service=\"worker\"}[5m])))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(sopir_run_duration_seconds_bucket{service=\"worker\"}[5m])))",
+          "legendFormat": "p95"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 0 }
+        },
+        "overrides": []
+      }
+    }
+  ]
+}

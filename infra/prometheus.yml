@@ -1,0 +1,73 @@
+# Prometheus scrape configuration for the Sopir pipeline.
+#
+# Every service exposes the same three endpoints:
+#   /metrics  Prometheus exposition
+#   /healthz  liveness - is the main loop turning?
+#   /readyz   readiness - are dependencies reachable?
+#
+# The daemons bind those on port 9101 via the standalone MetricsServer. The
+# backend mounts the same routes on FastAPI's own port, so it is scraped on
+# 8000. Ports are not published to the host for the daemons: Prometheus reaches
+# them over the compose network, the same path it would use against ECS service
+# discovery in production.
+
+global:
+  scrape_interval: 10s
+  scrape_timeout: 5s
+  evaluation_interval: 15s
+  external_labels:
+    stack: sopir-local
+
+# Alerting rules live in a separate file so they can be validated on their own
+# (`promtool check rules`) without the scrape config having to parse too.
+rule_files:
+  - /etc/prometheus/prometheus-rules.yml
+
+scrape_configs:
+  # Prometheus scraping itself gives a self-monitoring target and proves the
+  # scrape pipeline itself is alive.
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: backend
+    metrics_path: /metrics
+    # The backend serves observability routes through FastAPI on its own port
+    # rather than via the standalone MetricsServer the daemons use, so it is
+    # scraped on 8000.
+    static_configs:
+      - targets: ["backend:8000"]
+        labels:
+          component: api
+
+  - job_name: lake_writer
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["lake_writer:9101"]
+        labels:
+          component: bronze
+
+  - job_name: stream_processor
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["stream-processor:9101"]
+        labels:
+          component: silver
+
+  - job_name: worker
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["worker:9101"]
+        labels:
+          component: simulation
+
+  # Redpanda exposes its own broker and consumer-group metrics. Scraping it
+  # gives topic-level throughput and lag straight from the broker, which is the
+  # authority for lag; the per-service gauges above are the same number
+  # computed client-side and are useful when the broker is unreachable.
+  - job_name: redpanda
+    metrics_path: /public_metrics
+    static_configs:
+      - targets: ["redpanda:9644"]
+        labels:
+          component: broker

@@ -1,0 +1,147 @@
+# Alerting rules for the Sopir pipeline.
+#
+# Wired in via `rule_files` in infra/prometheus.yml. No Alertmanager is
+# configured, so these evaluate and expose as pending/firing on the Prometheus
+# UI (/alerts) and the Grafana panel; paging is deliberately left to whatever
+# the deployment provides.
+#
+# Two constraints shaped every expression below:
+#
+#   1. Only label values that some service actually emits are used. An alert on
+#      a label combination no producer produces is a permanently dead series,
+#      and a rule set full of dead series is a rule set people learn to ignore.
+#      See the omissions noted on SopirDlqRouted.
+#
+#   2. Every expression is written against the metric names registered in
+#      streaming/observability.py, not against the summary table in
+#      docs/architecture.md. The docs table is a subset; these rules are not.
+
+groups:
+  - name: sopir-availability
+    rules:
+      # A process that has died stops being a scrape target, which Prometheus
+      # reports on its own. What this catches instead is the case that matters
+      # more: the process is alive, still being scraped, and its main loop has
+      # stopped turning. Liveness is driven by an explicit heartbeat rather than
+      # by process-alive for exactly that reason.
+      - alert: SopirServiceDown
+        expr: sopir_service_up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.service }} main loop is not running"
+          description: >-
+            sopir_service_up has read 0 for 2 minutes on instance
+            {{ $labels.instance }}. The process is reachable but its main loop
+            has stopped advancing. Restart the container.
+
+      # Distinct from the above on purpose: a service can be perfectly healthy
+      # and still unable to serve, because a dependency it needs is gone. This
+      # means "take it out of rotation", not "restart it".
+      - alert: SopirServiceNotReady
+        expr: sopir_service_ready == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.service }} is running but not ready"
+          description: >-
+            sopir_service_ready has read 0 for 5 minutes on instance
+            {{ $labels.instance }}. The main loop is turning, but a named
+            dependency check is failing. The service is alive and not usable.
+
+  - name: sopir-pipeline-health
+    rules:
+      # The quiet failure. A consumer can be up, passing its liveness check, and
+      # still not be advancing -- blocked on a broker socket, wedged on a write,
+      # or simply stuck in a loop that no longer reaches the heartbeat. The
+      # signature is a flat time() minus last-progress timestamp.
+      #
+      # 120s is chosen against HEARTBEAT_MAX_AGE_SEC (60s default): two missed
+      # heartbeat ages before firing, so a single slow scrape cannot page.
+      - alert: SopirPipelineStalled
+        expr: time() - sopir_last_progress_timestamp_seconds > 120
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.service }} has stopped making progress"
+          description: >-
+            {{ $labels.service }} ({{ $labels.instance }}) has not advanced in
+            over 120 seconds while still reporting healthy. An idle consumer is
+            healthy and waiting, so this is only a problem if the topics it owns
+            actually have traffic.
+
+      # The data-loss counter. Every increment is a record that could not be
+      # processed and is not in the happy path. A sustained rise means the
+      # pipeline is dropping input.
+      #
+      # Note which stage values are reachable: deserialization, processing and
+      # sink_write. `schema_validation` is a valid ErrorStage symbol in
+      # schemas/dlq.avsc but no producer emits it, so there is deliberately no
+      # per-stage rule for it. See tests/test_schema_contracts.py, which pins
+      # that symbol set against the enum.
+      - alert: SopirDlqRouted
+        expr: increase(sopir_dlq_routed_total[15m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Records are being routed to the dead-letter topic"
+          description: >-
+            sopir_dlq_routed_total has increased within 15 minutes
+            (stage={{ $labels.stage }}). Records are leaving the happy path.
+            Check the stage label: deserialization means a schema mismatch,
+            sink_write means the store is refusing writes, processing means a
+            validation or windowing rule rejected the record. The raw payload is
+            preserved base64-encoded in sopir.dlq.v1, so the failure is
+            debuggable without going back to the producer.
+
+      # Consumer backlog. Measured from max(committed, low), so records that
+      # retention or compaction has already removed are not counted -- the number
+      # is always backlog the group can actually drain.
+      - alert: SopirConsumerLagHigh
+        expr: max by (group, topic) (sopir_consumer_lag) > 10000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Consumer group {{ $labels.group }} is falling behind on {{ $labels.topic }}"
+          description: >-
+            Lag on {{ $labels.topic }} has exceeded 10000 records for 10 minutes.
+            The group is draining more slowly than producers are publishing.
+
+      # Catch-all by category. The `kind` label localises it without needing a
+      # rule per category: sink_write, processing, db_window, db_events,
+      # lag_collect, database_probe, http_5xx, run_setup, simulation, run_cycle.
+      - alert: SopirErrorRate
+        expr: rate(sopir_errors_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Errors in {{ $labels.service }} (kind={{ $labels.kind }})"
+          description: >-
+            sopir_errors_total has been increasing for {{ $labels.service }} over
+            5 minutes with kind={{ $labels.kind }}. Sustained errors mean the
+            service is degrading rather than failing outright.
+
+  - name: sopir-simulation
+    rules:
+      # Distinct from the infra alerts above: this is the validation platform
+      # reporting a failed AD/ADAS scenario, not a broken service. A failed run
+      # is a legitimate, expected outcome of the work the platform exists to do,
+      # so it is separated so the two can be routed differently.
+      - alert: SopirSimulationRunFailed
+        expr: increase(sopir_runs_total{outcome="failed"}[15m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Simulation runs are failing"
+          description: >-
+            {{ $labels.service }} recorded at least one run with
+            outcome="failed" in the last 15 minutes. Check the run's
+            error_message; a failure here is a scenario or SUMO problem, not
+            necessarily a pipeline problem.

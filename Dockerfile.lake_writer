@@ -1,0 +1,10 @@
+FROM sopir-base:latest
+
+WORKDIR /app
+
+COPY streaming/ ./streaming/
+COPY schemas/ ./schemas/
+
+ENV PYTHONPATH=/app
+
+CMD ["python", "-m", "streaming.lake_writer"]

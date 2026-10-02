@@ -1,6 +1,11 @@
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+# spike_sumo.py is a standalone manual spike: a single script run by hand against a
+# local SUMO install to answer a specific integration question, not library code.
+# It predates the 100-char limit and is excluded rather than reformatted, since
+# reflowing it would obscure the output it was written to read.
+exclude = ["spike_sumo.py"]
 
 [tool.ruff.lint]
 # Matches the toolchain described in AGENTS.md: Black, isort and flake8.
@@ -15,4 +20,16 @@ select = ["E", "F", "I", "W"]
 "alembic/env.py" = ["E402"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["backend", "scenario_gen", "simulation", "evaluation", "dashboard"]
+known-first-party = ["backend", "scenario_gen", "simulation", "evaluation", "streaming", "dashboard"]
+
+# Phase 2.6. Non-blocking by design: the suite is not annotated to mypy --strict
+# yet, and turning that on before the annotations exist would bury real findings
+# under thousands of implicit-Any reports. The goal is a baseline that stops
+# getting worse, with the strictness ratcheted up as each module is touched.
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_unused_configs = true
+# `streaming/` and `dashboard/` still have unannotated callables; excluding them
+# keeps the signal-to-noise ratio usable while the rest is migrated.
+exclude = ["spike_sumo\\.py", "^streaming/", "^dashboard/"]

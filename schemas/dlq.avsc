@@ -1,0 +1,15 @@
+{
+  "type": "record",
+  "name": "DeadLetter",
+  "namespace": "sopir.dlq",
+  "fields": [
+    { "name": "schema_version", "type": "string", "default": "1.0.0" },
+    { "name": "event_id", "type": "string" },
+    { "name": "original_topic", "type": "string" },
+    { "name": "original_key", "type": ["null", "string"], "default": null },
+    { "name": "original_value", "type": "bytes" },
+    { "name": "error_reason", "type": "string" },
+    { "name": "error_stage", "type": { "type": "enum", "name": "ErrorStage", "symbols": ["schema_validation", "deserialization", "processing", "sink_write"] } },
+    { "name": "captured_at", "type": "long", "logicalType": "timestamp-millis" }
+  ]
+}

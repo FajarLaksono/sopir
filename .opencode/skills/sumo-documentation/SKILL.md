@@ -1,6 +1,6 @@
 ---
 name: sumo-documentation
-description: Keep project documentation accurate and explain SUMO/TraCI concepts precisely. Use when updating README.md, PLANNING.md, docs/architecture.md or docs/SUMO_RESEARCH.md, when explaining what SUMO does or does not model, or when a doc claim no longer matches the code.
+description: Keep project documentation accurate and explain SUMO/TraCI concepts precisely. Use when updating README.md, docs/PLANNING_phase_1_MVP.md, docs/PLANNING_phase_2_STREAMING_PIPELINE.md, docs/architecture.md or docs/SUMO_RESEARCH.md, when explaining what SUMO does or does not model, or when a doc claim no longer matches the code.
 compatibility: opencode
 metadata:
   project: sopir
@@ -18,7 +18,8 @@ Doc map:
 | file | owns |
 |------|------|
 | `README.md` | pitch, quickstart, architecture summary, env table, demo script |
-| `PLANNING.md` | roadmap, scope, phase gates, deliberate omissions |
+| `docs/PLANNING_phase_1_MVP.md` | MVP roadmap, scope, phase gates, deliberate omissions |
+| `docs/PLANNING_phase_2_STREAMING_PIPELINE.md` | streaming ingestion roadmap: topics, schemas, phases |
 | `docs/architecture.md` | components, data flow, decisions and their rationale, Phase 2 |
 | `docs/SUMO_RESEARCH.md` | SUMO/TraCI reference, observed-vs-available gap |
 | `AGENTS.md` | conventions and rules the agent follows |

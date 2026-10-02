@@ -1,0 +1,13 @@
+apiVersion: 1
+
+providers:
+  - name: sopir
+    orgId: 1
+    folder: Sopir
+    type: file
+    disableDeletion: false
+    # Points at the dashboards volume mounted in docker-compose.yml. The path is
+    # the in-container one; Grafana never reads the repo path directly.
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

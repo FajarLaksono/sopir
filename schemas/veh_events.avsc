@@ -1,0 +1,16 @@
+{
+  "type": "record",
+  "name": "VehicleEvent",
+  "namespace": "sopir.veh",
+  "fields": [
+    { "name": "schema_version", "type": "string", "default": "1.0.0" },
+    { "name": "event_id", "type": "string" },
+    { "name": "vehicle_id", "type": "string" },
+    { "name": "captured_at", "type": "long", "logicalType": "timestamp-millis" },
+    { "name": "run_id", "type": ["null", "string"], "default": null },
+    { "name": "event_code", "type": "string" },
+    { "name": "severity", "type": { "type": "enum", "name": "Severity", "symbols": ["info", "warning", "critical"] } },
+    { "name": "source_ecu", "type": "string" },
+    { "name": "details", "type": ["null", "string"], "default": null }
+  ]
+}

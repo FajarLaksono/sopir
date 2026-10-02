@@ -1,0 +1,191 @@
+# Isolated stack for tests/test_pipeline_integration.py.
+#
+# Deliberately separate from docker-compose.yml rather than a compose profile.
+# The test measures deltas against a baseline, so it is re-runnable against a
+# stack that already holds data -- but isolating it still matters: a replay
+# legitimately doubles the lake, and doing that to a developer's running volume
+# would be rude and hard to undo. It also lets CI run it on the same runner
+# without colliding with anything.
+#
+# Brought up and torn down by .github/workflows/ci-integration.yml and
+# scripts/integration_check.sh, not by hand.
+
+name: sopir-integration
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: opendrivelab
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    tmpfs:
+      # The integration test never needs Postgres data to survive, and tmpfs
+      # keeps a failed run from leaving a half-initialised volume behind.
+      - /var/lib/postgresql/data
+
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v24.3.6
+    command:
+      - redpanda
+      - start
+      - --overprovisioned
+      - --smp=1
+      - --memory=1G
+      - --reserve-memory=0M
+      - --node-id=0
+      - --check=false
+      - --kafka-addr=internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --rpc-addr=0.0.0.0:33145
+      - --advertise-kafka-addr=internal://redpanda:9092,external://localhost:19092
+      - --advertise-rpc-addr=redpanda:33145
+    healthcheck:
+      # -X brokers=, not --brokers: v24.3.6's rpk takes the broker list as a
+      # config override, and passing an unsupported flag makes it print usage
+      # and exit non-zero, so the service never reports healthy.
+      test: ["CMD-SHELL", "rpk cluster health -X brokers=redpanda:9092"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+
+  localstack:
+    image: localstack/localstack:3.0
+    environment:
+      SERVICES: s3
+      # The lake writer's credentials are the literal defaults from .env.example.
+      # A test stack does not need real credentials and must not require them.
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: us-east-1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:4566/_localstack/health | grep -q '\"s3\": *\"available\"' || curl -sf http://localhost:4566/_localstack/health | grep -q '\"s3\": *\"running\"'"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  # The same init services the main stack uses, unchanged. Running them here is
+  # the point: it proves the automation the developer relies on actually works
+  # from a clean volume, which is exactly the situation CI is in and the one a
+  # developer's machine never reproduces.
+  schema-init:
+    build:
+      context: .
+      dockerfile: Dockerfile.init
+    environment:
+      SCHEMA_REGISTRY_URL: http://redpanda:8081
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    command: ["python", "scripts/register_schemas.py"]
+    restart: on-failure
+
+  topic-init:
+    # The Redpanda image, not Dockerfile.init: `rpk` only ships inside it. Using
+    # a Python base here fails with "rpk: command not found" and, because the
+    # service is declared idempotent, just retries until it is restarted.
+    image: docker.redpanda.com/redpandadata/redpanda:v24.3.6
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      schema-init:
+        condition: service_completed_successfully
+    entrypoint: ["/bin/bash", "/scripts/create-topics.sh"]
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
+    volumes:
+      - ./infra/create-topics.sh:/scripts/create-topics.sh:ro
+    restart: on-failure
+
+  s3-init:
+    image: amazon/aws-cli:latest
+    environment:
+      AWS_ENDPOINT_URL: http://localstack:4566
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: us-east-1
+      BUCKET_NAME: sopir-raw
+    depends_on:
+      localstack:
+        condition: service_healthy
+    volumes:
+      - ./infra/lifecycle.json:/tmp/lifecycle.json:ro
+      - ./infra/s3-init.sh:/s3-init.sh:ro
+    # /bin/sh, matching the script's shebang and the main stack. It is POSIX, so
+    # there is no reason to depend on bash being present.
+    entrypoint: ["/bin/sh", "/s3-init.sh"]
+    restart: on-failure
+
+  lake_writer:
+    build:
+      context: .
+      dockerfile: Dockerfile.lake_writer
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
+      SCHEMA_REGISTRY_URL: http://redpanda:8081
+      S3_ENDPOINT_URL: http://localstack:4566
+      S3_ACCESS_KEY: test
+      S3_SECRET_KEY: test
+      S3_BUCKET: sopir-raw
+      LAKE_CONSUMER_GROUP: lake-writer
+      # Small batches so the run finishes quickly; the flush interval is the
+      # only thing that has to be short enough to settle inside the test's
+      # own timeout.
+      LAKE_BATCH_SIZE: "50"
+      LAKE_FLUSH_INTERVAL_SEC: "3"
+      LOG_LEVEL: INFO
+    depends_on:
+      db:
+        condition: service_healthy
+      schema-init:
+        condition: service_completed_successfully
+      topic-init:
+        condition: service_completed_successfully
+      s3-init:
+        condition: service_completed_successfully
+
+  # Not started by `up`; run explicitly with
+  #   docker compose -f docker-compose.test.yml run --rm pipeline_test
+  # so it produces, asserts and exits without ever being a long-running service.
+  pipeline_test:
+    build:
+      context: .
+      dockerfile: Dockerfile.base
+    profiles: ["test"]
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
+      SCHEMA_REGISTRY_URL: http://redpanda:8081
+      S3_ENDPOINT_URL: http://localstack:4566
+      S3_ACCESS_KEY: test
+      S3_SECRET_KEY: test
+      S3_BUCKET: sopir-raw
+      LAKE_CONSUMER_GROUP: lake-writer
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/opendrivelab
+      # The test starts a second LakeWriter in-process. Without this it would
+      # contend with the real one for :9101, and observability is explicitly
+      # designed to degrade rather than fail, so the port is simply dropped.
+      METRICS_PORT: "0"
+      LOG_LEVEL: INFO
+    depends_on:
+      db:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+      lake_writer:
+        condition: service_started
+    # Source is bind-mounted rather than baked in, for the reason given in
+    # .github/workflows/ci.yml: the image copies source at build time, so tests
+    # run against a baked copy would not be testing this commit.
+    volumes:
+      - .:/src
+    working_dir: /src
+    # -m integration overrides the default deselection in pytest.ini, because the
+    # last -m on the command line wins.
+    command: ["python", "-m", "pytest", "-m", "integration", "-v", "-p", "no:warnings"]

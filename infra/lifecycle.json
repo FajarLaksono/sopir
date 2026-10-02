@@ -1,0 +1,10 @@
+{
+  "Rules": [
+    {
+      "ID": "expire-30d",
+      "Filter": { "Prefix": "source=" },
+      "Status": "Enabled",
+      "Expiration": { "Days": 30 }
+    }
+  ]
+}

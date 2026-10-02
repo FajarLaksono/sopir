@@ -38,42 +38,260 @@ graph TB
 
 ### Prerequisites
 - Docker Desktop (running)
-- Python 3.10+ (for local development)
-- SUMO 1.27+ (for local testing)
+- Python 3.10+ (for local development, optional - only for the spike below)
+- `jq` and `curl`, if you want to drive the API from the shell
+- SUMO 1.27+ only if running the TraCI spike locally; the Docker stack bundles it
 
-### Full Platform (Docker Compose)
+### End-to-End Verification Run
+
+Walks the whole system and checks each stage actually did something. Follow it in
+order - several later steps assume earlier ones produced data.
+
+Every command below is meant for bash (Linux, macOS, or WSL). `jq` is used for
+parsing; on Windows, `curl` and `jq` ship separately or run through WSL.
+
+#### Ports and resources
+
+Docker Desktop running, ~4 GB RAM free for 13 services. Ports used: `3000`
+(Grafana), `4566` (LocalStack S3), `8000` (API), `8081` (Schema Registry),
+`8501` (Dashboard), `9090` (Prometheus), `9092` (Kafka/Redpanda).
 
 ```bash
-# 1. Clone and setup
 cd sopir
-cp .env.example .env  # Edit if needed
+cp .env.example .env   # defaults work locally; edit only if ports clash
+```
 
-# 2. Start all services
+#### Step 0 - start from clean (optional)
+
+Skip if you have never run this. Required if a previous run left partial state.
+
+`docker compose down -v` alone is **not** enough to reset the raw lake. It drops
+the object store but leaves consumer offsets committed, so the writer resumes
+where it stopped and you end up with gaps that look like data loss. Reset both:
+
+```bash
+docker compose stop lake_writer stream-processor
+docker compose rm -f lake_writer stream-processor
+docker compose exec redpanda rpk group delete lake-writer
+docker compose exec redpanda rpk group delete stream-processor
+docker compose exec localstack sh -c "awslocal s3 rm s3://sopir-raw --recursive"
+docker compose down -v
+```
+
+#### Step 1 - build and start
+
+```bash
 docker compose up --build -d
+```
 
-# 3. Generate scenarios (creates 4 scenario types)
+**`--build` is not optional.** The images copy the source in at build time and
+there is no bind-mount, so a plain `up` runs whatever was last *built* - which
+may predate your edits. This is the single most common reason the running system
+contradicts the code you are reading. If behaviour looks wrong, rebuild before
+investigating anything else.
+
+#### Step 2 - verify the init gate
+
+Three one-shot services prepare the pipeline. **Everything downstream waits on
+them**, so if they are not green, nothing after this point means anything:
+
+```bash
+docker compose ps -a --format "table {{.Service}}\t{{.Status}}" | grep init
+```
+
+Expected - all three `Exited (0)`:
+
+```
+SERVICE      STATUS
+s3-init      Exited (0)
+schema-init  Exited (0)
+topic-init   Exited (0)
+```
+
+These register the Avro schemas, create the four topics, and create the
+versioned bucket. Re-running them is safe and expected: they are idempotent, so
+a failure here is a real fault rather than "already done". To see what happened:
+
+```bash
+docker compose logs schema-init topic-init s3-init
+```
+
+Manual fallback if you ever need to re-run just one:
+
+```bash
+docker compose run --rm schema-init
+```
+
+#### Step 3 - wait for health
+
+```bash
+until curl -fsS http://localhost:8000/healthz >/dev/null 2>&1; do sleep 2; done
+echo "backend up"
+```
+
+| URL | Shows |
+|-----|-------|
+| http://localhost:8000/docs | Interactive API docs |
+| http://localhost:8501 | Dashboard (Validation / Pipeline tabs) |
+| http://localhost:3000 | Grafana, `admin`/`admin` |
+| http://localhost:9090/targets | Prometheus scrape targets |
+
+Per-service health, from inside a container:
+
+```bash
+docker compose exec lake_writer python -c \
+  "import urllib.request; print(urllib.request.urlopen('http://localhost:9101/readyz').read().decode())"
+```
+
+#### Step 4 - generate scenarios
+
+```bash
 docker compose exec backend python -m scenario_gen.cli generate
+curl -s http://localhost:8000/api/v1/scenarios | jq '.items[].type'
+```
 
-# 4. Start workers (scale for parallel simulation)
+Expect 4 types - `intersection`, `highway_merge`, `pedestrian_crossing`,
+`lane_change`. Zero scenarios means the templates failed validation; check
+`docker compose logs backend`.
+
+#### Step 5 - run simulations
+
+```bash
 docker compose up --scale worker=3 -d
 
-# 5. Create simulation runs (one per scenario type)
-SCENARIO_IDS=$(curl -s http://localhost:8000/api/v1/scenarios | jq -r '.items[].id')
+SCENARIO_IDS=$(curl -s "http://localhost:8000/api/v1/scenarios?page_size=100" | jq -r '.items[].id')
 for SID in $SCENARIO_IDS; do
-  curl -X POST http://localhost:8000/api/v1/runs \
+  curl -s -X POST http://localhost:8000/api/v1/runs \
     -H "Content-Type: application/json" \
-    -d "{\"scenario_id\": \"$SID\"}"
+    -d "{\"scenario_id\": \"$SID\"}" | jq -r '.id'
 done
-
-# 6. Wait 30-60s for workers to complete, then evaluate all runs
-RUN_IDS=$(curl -s http://localhost:8000/api/v1/runs | jq -r '.items[].id')
-for RID in $RUN_IDS; do
-  curl -X POST http://localhost:8000/api/v1/metrics/runs/$RID/evaluate
-done
-
-# 7. Open dashboard
-open http://localhost:8501
 ```
+
+Wait on status rather than a fixed sleep - 3 workers on 4 SUMO runs is not a
+predictable duration. The loop also exits on `failed`, so a broken run reports
+itself instead of hanging the terminal:
+
+```bash
+RUN_IDS=$(curl -s "http://localhost:8000/api/v1/runs?page_size=100" \
+  | jq -r '.items[] | select(.status=="queued" or .status=="running") | .id')
+for RID in $RUN_IDS; do
+  while true; do
+    STATUS=$(curl -s http://localhost:8000/api/v1/runs/$RID | jq -r .status)
+    [ "$STATUS" = "completed" ] && { echo "run $RID completed"; break; }
+    [ "$STATUS" = "failed" ]    && { echo "run $RID FAILED"; break; }
+    sleep 5
+  done
+done
+```
+
+(`page_size` defaults to 20; raise it or repeat runs will overflow the first page
+and you will silently evaluate a subset.)
+
+Then evaluate, which computes metrics and detects failures:
+
+```bash
+RUN_IDS=$(curl -s "http://localhost:8000/api/v1/runs?page_size=100" | jq -r '.items[].id')
+for RID in $RUN_IDS; do
+  curl -s -X POST http://localhost:8000/api/v1/metrics/runs/$RID/evaluate | jq -c '{collision_count, min_ttc, avg_speed}'
+done
+```
+
+#### Step 6 - send streaming traffic
+
+Phase 1 above wrote telemetry straight to Postgres. Phase 2 routes it through
+Kafka. Both paths run side by side by design - the Postgres path is the parity
+oracle the streaming path is measured against, so it is kept deliberately.
+
+**Vehicle logs (CAN / GNSS / events):**
+
+```bash
+docker compose run --rm vehicle_simulator
+```
+
+Defaults are 5 vehicles over 120 s with seed 42, defined in
+`vehicle_simulator/simulator.py`. These are *not* in `.env.example` - override on
+the command line with `-e VEHICLE_COUNT=...` / `-e SIM_DURATION=...` /
+`-e SIM_SEED=...`.
+
+**SUMO telemetry through Kafka:**
+
+```bash
+docker compose build worker
+docker compose run --rm -e TELEMETRY_SINK=kafka -e PYTHONUNBUFFERED=1 worker
+```
+
+Two warnings specific to this step:
+
+- `docker compose run` leaves the worker container **alive and polling** after
+  the command returns. A leftover Kafka-sink worker will claim the next queued
+  run and starve the Postgres-sink workers. Stop them between runs:
+  ```bash
+  for c in $(docker ps --filter "name=sopir-worker" -q); do docker stop "$c"; done
+  ```
+- If the worker image predates `simulation/telemetry_sink.py`, it silently
+  ignores `TELEMETRY_SINK` and writes to Postgres. `docker compose build worker`
+  first, and confirm with `docker compose logs worker | grep -i sink`.
+
+#### Step 7 - check the reconciliation panel
+
+Open the **Pipeline** tab at http://localhost:8501. It reads four figures
+straight from the systems that own them - Kafka watermarks, Parquet row counts,
+Postgres row counts, and distinct DLQ keys on the compacted topic. It does not
+read Prometheus counters, because those reset on restart and would disagree with
+themselves exactly when you are checking whether a restart lost data.
+
+| State | Meaning |
+|-------|---------|
+| **Balanced** - `produced = landed + dead-lettered` | Correct. Every record is accounted for. |
+| **Short** - `produced > landed + dead-lettered` | Real problem. Records went missing; investigate. |
+| **Surplus** - `landed > produced` | Benign. A replay re-wrote rows into an append-only lake. |
+
+On the surplus: bronze genuinely duplicates under replay, because object keys
+embed the offset range buffered at flush time and a replay re-batches
+differently. This is expected and is resolved in silver, where `stream_events`
+deduplicates on `event_id`. What bronze guarantees under replay is that no
+`event_id` is lost, none is invented, and no payload is rewritten - verified by
+`tests/test_pipeline_integration.py`. Only a *shortfall* indicates loss.
+
+```bash
+docker compose exec localstack awslocal s3 ls s3://sopir-raw --recursive
+docker compose exec db psql -U postgres -d opendrivelab \
+  -c "SELECT stream_key, record_count, collision_count FROM stream_metrics;"
+```
+
+#### Step 8 - observability
+
+```bash
+# Prometheus targets should all be UP
+open http://localhost:9090/targets
+
+# Grafana dashboard is provisioned automatically
+open http://localhost:3000   # admin/admin
+```
+
+Seven alert rules are loaded from `infra/prometheus-rules.yml`. The two worth
+knowing: `sopir_dlq_routed_total` is the data-loss counter (every increment is a
+record dropped from the happy path), and a flat `time() -
+sopir_last_progress_timestamp_seconds` means a consumer is up but stalled.
+
+#### Step 9 - tear down
+
+```bash
+docker compose down          # keep volumes
+docker compose down -v       # discard all state; see Step 0 before the next run
+```
+
+#### Troubleshooting
+
+| Symptom | Cause and fix |
+|---------|---------------|
+| `UndefinedTableError` on `stream_*` tables | Known race: `stream-processor` waits on `db:service_healthy` but not on `backend`, and the backend's startup `create_all()` is what creates the silver tables. Wait for `backend` to be healthy, then `docker compose restart stream-processor`. |
+| Running system contradicts the source | Stale image. `docker compose build <service>`. |
+| An `init` service shows `Exited (1)` | Real fault - they are idempotent, so "already exists" is not a failure mode. Read `docker compose logs schema-init topic-init s3-init`. |
+| A run is claimed by an unexpected worker | Leftover `docker compose run` worker from the Kafka step. See Step 6 for the cleanup loop. |
+| Dashboard shows a surplus | Expected after a replay. Not data loss - see Step 7. |
+| `docker compose ps` shows services you stopped | One-shot services stay in `Exited` state by design. `docker compose ps --services --filter status=running` for just the live ones. |
+| Looking for the gold layer | Not implemented. The layers that exist are bronze (Parquet in the object store) and silver (Postgres). No gold tier is wired. |
 
 ### Local Development Setup
 
@@ -173,7 +391,10 @@ sopir/
 ├── pyproject.toml               # Ruff config
 ├── .env.example                 # Environment template
 ├── .env                         # Local env (gitignored)
-├── PLANNING.md                  # Implementation roadmap
+├── opencode.json                # AI agent config (permissions, instructions)
+├── .opencode/                   # AI agent commands and skills
+│   ├── commands/                # Slash commands (/generate-scenarios, ...)
+│   └── skills/                  # Domain skills loaded on demand
 ├── AGENTS.md                    # AI agent guidelines
 ├── alembic.ini                  # Alembic config
 ├── alembic/                     # DB migrations
@@ -183,7 +404,11 @@ sopir/
 │       ├── 0001_initial_schema.py
 │       └── 0002_ttc_per_step.py
 ├── docs/
-│   └── architecture.md          # Architecture documentation
+│   ├── architecture.md          # Architecture documentation
+│   ├── SUMO_RESEARCH.md         # SUMO/TraCI research reference
+│   ├── PLANNING_phase_1_MVP.md   # MVP roadmap (delivered)
+│   ├── PLANNING_phase_2_STREAMING_PIPELINE.md  # Phase 2: streaming ingestion
+│   └── AI_CONFIGURATION_PLAN.md # AI agent configuration
 ├── backend/                     # FastAPI backend
 │   ├── main.py                  # App entry point
 │   ├── config.py                # Pydantic settings
@@ -216,8 +441,7 @@ sopir/
 ├── simulation/                  # SUMO worker
 │   ├── __init__.py
 │   ├── worker.py
-│   ├── traci_client.py
-│   └── telemetry.py
+│   └── traci_client.py
 ├── evaluation/                  # Metrics & failure detection
 │   ├── __init__.py
 │   ├── metrics.py
@@ -230,7 +454,6 @@ sopir/
 │       ├── metric_charts.py
 │       └── failure_list.py
 └── tests/                       # Unit tests
-    ├── __init__.py
     ├── conftest.py              # Shared fixtures
     ├── test_metrics.py
     ├── test_failure_detector.py

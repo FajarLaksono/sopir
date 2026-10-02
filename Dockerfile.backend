@@ -1,17 +1,12 @@
-FROM python:3.11-slim
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc libpq-dev && \
-    rm -rf /var/lib/apt/lists/*
+FROM sopir-base:latest
 
 WORKDIR /app
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir --timeout=300 -r requirements.txt
 
 COPY backend ./backend
 COPY scenario_gen ./scenario_gen
 COPY evaluation ./evaluation
+COPY streaming ./streaming
+COPY schemas ./schemas
 COPY tests ./tests
 COPY pytest.ini .
 COPY alembic.ini .

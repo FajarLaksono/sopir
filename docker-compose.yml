@@ -1,6 +1,10 @@
-version: "3.9"
-
 services:
+  base:
+    build:
+      context: .
+      dockerfile: Dockerfile.base
+    image: sopir-base:latest
+
   db:
     image: postgres:16-alpine
     container_name: opendrivelab-db
@@ -18,18 +22,130 @@ services:
     networks:
       - opendrivelab
 
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v24.3.6
+    container_name: opendrivelab-redpanda
+    command:
+      - redpanda
+      - start
+      - --kafka-addr=PLAINTEXT://0.0.0.0:9092
+      - --advertise-kafka-addr=PLAINTEXT://redpanda:9092
+      - --schema-registry-addr=0.0.0.0:8081
+      - --rpc-addr=0.0.0.0:33145
+      - --advertise-rpc-addr=redpanda:33145
+    ports:
+      - "9092:9092"
+      - "8081:8081"
+    volumes:
+      - redpanda_data:/var/lib/redpanda/data
+    networks:
+      - opendrivelab
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health -X brokers=redpanda:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  localstack:
+    image: localstack/localstack:3.0
+    container_name: opendrivelab-localstack
+    environment:
+      SERVICES: s3
+      DEBUG: "1"
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+    ports:
+      - "4566:4566"
+    volumes:
+      - localstack_data:/var/lib/localstack
+    networks:
+      - opendrivelab
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  s3-init:
+    # One-shot, idempotent. The logic lives in infra/s3-init.sh rather than
+    # inline so docker-compose.test.yml can share it verbatim instead of
+    # carrying a second copy that could drift.
+    image: amazon/aws-cli:latest
+    container_name: opendrivelab-s3-init
+    depends_on:
+      localstack:
+        condition: service_healthy
+    environment:
+      AWS_ENDPOINT_URL: http://localstack:4566
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: us-east-1
+      BUCKET_NAME: sopir-raw
+    entrypoint: ["/bin/sh", "/s3-init.sh"]
+    volumes:
+      - ./infra/lifecycle.json:/tmp/lifecycle.json:ro
+      - ./infra/s3-init.sh:/s3-init.sh:ro
+    networks:
+      - opendrivelab
+
+  # rpk only ships inside the Redpanda image, which is why topic creation was a
+  # manual `docker compose cp` step until now. The script is bind-mounted rather
+  # than copied in so an edit to infra/create-topics.sh takes effect on restart.
+  topic-init:
+    image: docker.redpanda.com/redpandadata/redpanda:v24.3.6
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "/scripts/create-topics.sh"]
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
+    volumes:
+      - ./infra/create-topics.sh:/scripts/create-topics.sh:ro
+    networks:
+      - opendrivelab
+
+  schema-init:
+    # One-shot. Registers all five Avro schemas and exits. Re-running is a no-op:
+    # re-registering a byte-identical schema returns the existing schema id.
+    build:
+      context: .
+      dockerfile: Dockerfile.init
+    depends_on:
+      base:
+        condition: service_completed_successfully
+      redpanda:
+        condition: service_healthy
+    environment:
+      SCHEMA_REGISTRY_URL: http://redpanda:8081
+    networks:
+      - opendrivelab
+
   backend:
     build:
       context: .
       dockerfile: Dockerfile.backend
+    depends_on:
+      base:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
     container_name: opendrivelab-backend
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/opendrivelab
       POLL_INTERVAL: "5"
       TELEMETRY_BATCH_SIZE: "100"
-    depends_on:
-      db:
-        condition: service_healthy
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
+      SCHEMA_REGISTRY_URL: http://redpanda:8081
+      S3_ENDPOINT: http://localstack:4566
+      S3_ACCESS_KEY: test
+      S3_SECRET_KEY: test
+      S3_BUCKET: sopir-raw
+      TELEMETRY_SINK: postgres
     ports:
       - "8000:8000"
     volumes:
@@ -37,22 +153,192 @@ services:
     networks:
       - opendrivelab
     command: uvicorn backend.main:app --host 0.0.0.0 --port 8000
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/readyz', timeout=3).status==200 else 1)\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   worker:
     build:
       context: .
       dockerfile: Dockerfile.worker
+    depends_on:
+      base:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+      topic-init:
+        condition: service_completed_successfully
+      schema-init:
+        condition: service_completed_successfully
     # container_name: opendrivelab-worker
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/opendrivelab
       POLL_INTERVAL: "5"
       TELEMETRY_BATCH_SIZE: "100"
       SUMO_HOME: /usr/share/sumo
-    depends_on:
-      db:
-        condition: service_healthy
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
+      SCHEMA_REGISTRY_URL: http://redpanda:8081
+      S3_ENDPOINT: http://localstack:4566
+      S3_ACCESS_KEY: test
+      S3_SECRET_KEY: test
+      S3_BUCKET: sopir-raw
+      TELEMETRY_SINK: postgres
+      METRICS_PORT: "9101"
     volumes:
       - scenario_data:/data/scenarios
+    networks:
+      - opendrivelab
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:9101/healthz', timeout=3).status==200 else 1)\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  vehicle_simulator:
+    build:
+      context: .
+      dockerfile: Dockerfile.vehicle_simulator
+    depends_on:
+      base:
+        condition: service_completed_successfully
+      redpanda:
+        condition: service_healthy
+      topic-init:
+        condition: service_completed_successfully
+      schema-init:
+        condition: service_completed_successfully
+    container_name: opendrivelab-vehicle-sim
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
+      SCHEMA_REGISTRY_URL: http://redpanda:8081
+      VEHICLE_COUNT: "5"
+      SIM_DURATION: "120"
+      SIM_RATE: "10"
+      SIM_SEED: "42"
+    networks:
+      - opendrivelab
+
+  lake_writer:
+    build:
+      context: .
+      dockerfile: Dockerfile.lake_writer
+    depends_on:
+      base:
+        condition: service_completed_successfully
+      redpanda:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+      s3-init:
+        condition: service_completed_successfully
+      topic-init:
+        condition: service_completed_successfully
+      schema-init:
+        condition: service_completed_successfully
+    container_name: opendrivelab-lake-writer
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
+      SCHEMA_REGISTRY_URL: http://redpanda:8081
+      S3_ENDPOINT_URL: http://localstack:4566
+      S3_BUCKET: sopir-raw
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: us-east-1
+      LAKE_CONSUMER_GROUP: lake-writer
+      LAKE_BATCH_SIZE: "200"
+      LAKE_FLUSH_INTERVAL_SEC: "5"
+      METRICS_PORT: "9101"
+      LAG_REFRESH_SEC: "10"
+      LOG_LEVEL: INFO
+    networks:
+      - opendrivelab
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:9101/readyz', timeout=3).status==200 else 1)\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
+
+  stream-processor:
+    build:
+      context: .
+      dockerfile: Dockerfile.processor
+    depends_on:
+      base:
+        condition: service_completed_successfully
+      redpanda:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+      topic-init:
+        condition: service_completed_successfully
+      schema-init:
+        condition: service_completed_successfully
+    container_name: opendrivelab-stream-processor
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
+      SCHEMA_REGISTRY_URL: http://redpanda:8081
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/opendrivelab
+      PROCESSOR_CONSUMER_GROUP: stream-processor
+      # How long a run's window stays open without new telemetry before it is
+      # evaluated. Must exceed the gap between the last telemetry record and the
+      # worker finishing, or windows close early and metrics are partial.
+      PROCESSOR_IDLE_TIMEOUT_SEC: "20"
+      PROCESSOR_RETAIN_EVENTS: "1"
+      METRICS_PORT: "9101"
+      LAG_REFRESH_SEC: "10"
+      LOG_LEVEL: INFO
+    networks:
+      - opendrivelab
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:9101/readyz', timeout=3).status==200 else 1)\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: opendrivelab-prometheus
+    depends_on:
+      - backend
+      - lake_writer
+      - stream-processor
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infra/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infra/prometheus-rules.yml:/etc/prometheus/prometheus-rules.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+      - --web.enable-lifecycle
+    networks:
+      - opendrivelab
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: opendrivelab-grafana
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
     networks:
       - opendrivelab
 
@@ -63,8 +349,23 @@ services:
     container_name: opendrivelab-dashboard
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/opendrivelab
+      # The reconciliation panel reads producer watermarks off Kafka and row
+      # counts off the object store, so the dashboard needs those two clients.
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
+      S3_ENDPOINT: http://localstack:4566
+      S3_BUCKET: sopir-raw
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: us-east-1
     depends_on:
-      - backend
+      base:
+        condition: service_completed_successfully
+      backend:
+        condition: service_started
+      redpanda:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
     ports:
       - "8501:8501"
     networks:
@@ -73,6 +374,10 @@ services:
 volumes:
   postgres_data:
   scenario_data:
+  redpanda_data:
+  localstack_data:
+  prometheus_data:
+  grafana_data:
 
 networks:
   opendrivelab:

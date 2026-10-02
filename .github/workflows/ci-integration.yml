@@ -1,0 +1,75 @@
+name: CI (integration)
+
+# The heavy tier: brings up Redpanda, the Schema Registry, LocalStack and a live
+# lake writer, then asserts the accounting identity and replay idempotency
+# against them. Excluded from ordinary pushes because it needs several minutes
+# of wall clock and a real broker.
+#
+# Kept in a separate workflow from the fast tier on purpose. Folding it into
+# ci.yml as a second job would make every push wait for it, and a job that only
+# sometimes runs is a job nobody watches.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call:
+
+concurrency:
+  group: integration-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  COMPOSE: docker compose -f docker-compose.test.yml
+
+jobs:
+  streaming:
+    name: Raw lake reconciliation and replay
+    runs-on: ubuntu-latest
+    # Real Redpanda plus LocalStack is a few GB of images; the default 7GB
+    # runner disk is enough but the margin is thin once the app images build.
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # --quiet so a green run is not a wall of resolved YAML. Any structural
+      # error still fails the step, which is the point of having it here rather
+      # than relying on the first `up` to fail.
+      - name: Validate the test stack
+        run: ${{ env.COMPOSE }} config --quiet
+
+      # The topic script uses `rpk`, which only exists inside the Redpanda image.
+      # Building first turns a confusing runtime "command not found" into a
+      # build-time failure.
+      - name: Build the test images
+        run: ${{ env.COMPOSE }} build schema-init pipeline_test lake_writer
+
+      # `up -d` blocks on the init services: topic-init waits for schema-init,
+      # and lake_writer waits for all three, so returning means the topics
+      # exist and the bucket is versioned.
+      - name: Start the stack
+        run: ${{ env.COMPOSE }} up -d --wait db redpanda localstack schema-init topic-init s3-init lake_writer
+
+      - name: Show logs on failure
+        if: failure()
+        run: |
+          echo "::group::compose ps"
+          $COMPOSE ps -a || true
+          echo "::endgroup::"
+          for svc in schema-init topic-init s3-init lake_writer; do
+            echo "::group::$svc"
+            $COMPOSE logs --no-color --tail 100 "$svc" || true
+            echo "::endgroup::"
+          done
+
+      - name: Run the integration tests
+        run: ${{ env.COMPOSE }} run --rm pipeline_test
+
+      # Always runs, so a failed run does not leave a broker and an object store
+      # holding the runner's disk until the VM is reclaimed.
+      - name: Tear down
+        if: always()
+        run: ${{ env.COMPOSE }} down -v --remove-orphans

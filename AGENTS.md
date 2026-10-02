@@ -131,11 +131,13 @@ evaluation/
 ### Dashboard (Streamlit)
 ```
 dashboard/
-├── app.py                    # Main entry, page config
+├── app.py                       # Main entry, page config
+├── pipeline_stats.py            # Reconciliation fetch (Kafka/S3/Postgres)
 └── components/
-    ├── run_table.py          # AgGrid or st.dataframe
-    ├── metric_charts.py      # Plotly charts
-    └── failure_list.py       # Filterable failure view
+    ├── run_table.py             # AgGrid or st.dataframe
+    ├── metric_charts.py         # Plotly charts
+    ├── failure_list.py          # Filterable failure view
+    └── reconciliation.py        # Produced vs landed vs processed vs DLQ
 ```
 
 **Rules**:
@@ -143,6 +145,12 @@ dashboard/
 - Separate data fetching from rendering
 - Components = pure functions (data → Streamlit elements)
 - No business logic in dashboard
+- Read pipeline figures from the system that owns them (Kafka watermarks,
+  Parquet row counts, Postgres), **not** from Prometheus counters — they reset
+  on restart, which is exactly when someone is checking for data loss
+- `produced == landed + dead_lettered` is a *quiesced-pipeline* identity. A
+  replay duplicates the append-only lake, so `landed > produced` is benign;
+  only a shortfall means records went missing. Never render both as one error.
 
 ---
 
@@ -200,7 +208,27 @@ open http://localhost:8501
 ### Integration Tests (Require Services)
 - API contract tests via `httpx.AsyncClient` against test DB
 - Worker simulation with minimal SUMO config
-- Run in CI with `docker compose -f docker-compose.test.yml up`
+- `tests/test_pipeline_integration.py` — Kafka → raw lake reconciliation and
+  replay safety, marked `@pytest.mark.integration`
+- Run in CI with `scripts/integration_check.sh` (wraps
+  `docker compose -f docker-compose.test.yml`)
+
+**Two CI tiers**:
+| Tier | Workflow | When | Runs |
+|------|----------|------|------|
+| Fast | `ci.yml` | every push | Ruff, mypy (non-blocking), full unit suite against Postgres, Compose + alert-rule validation |
+| Heavy | `ci-integration.yml` | `main`, PRs to `main`, manual | Redpanda + LocalStack + lake writer + the integration suite |
+
+Integration tests are **deselected by default** via `pytest.ini`
+(`addopts = -m "not integration"`). Run them with
+`pytest -m integration`, or the `-m` flag on the command line overrides
+`addopts`, so `scripts/integration_check.sh` can select them without a flag
+that fights the config.
+
+Do not assert that a replay is idempotent. Object keys embed the offset range
+buffered at flush time, so a replay writes new keys and duplicates rows by
+design. Assert what holds: no `event_id` lost, none invented, no payload
+rewritten.
 
 ### Manual Verification Checklist
 - [ ] `docker compose up` starts cleanly

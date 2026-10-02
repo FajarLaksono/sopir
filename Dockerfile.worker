@@ -1,16 +1,21 @@
+# Worker image based on SUMO with Python dependencies
 FROM ghcr.io/eclipse-sumo/sumo:1.27.1
 
+# Install pip and Python dependencies with cache
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3-pip && \
-    rm -rf /var/lib/apt/lists/*
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir --timeout=300 -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --timeout=300 -r requirements.txt
 
 COPY backend ./backend
 COPY simulation ./simulation
+COPY streaming ./streaming
+COPY schemas ./schemas
 
 ENV PYTHONPATH=/usr/share/sumo/tools
 ENV SUMO_HOME=/usr/share/sumo

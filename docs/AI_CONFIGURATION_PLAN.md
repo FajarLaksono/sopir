@@ -87,7 +87,7 @@ it correctly.
 | `traci-debugging` | `simulation/worker.py`, `traci_client.py`, SUMO process lifecycle | "run is stuck", "no telemetry", "sumo not found", "orphaned running run" |
 | `evaluation-metrics` | `evaluation/metrics.py`, `failure_detector.py`, metric and threshold work | "add a metric", "why is min_ttc wrong", "add a failure rule", "test the metrics" |
 | `dashboard-components` | `dashboard/app.py`, `dashboard/components/` | "add a metric chart", "dashboard is slow", "dashboard shows no rows" |
-| `sumo-documentation` | `README.md`, `PLANNING.md`, `docs/`, SUMO/TraCI accuracy, Sopir naming | "update the README", "explain what SUMO models", "rename in the docs" |
+| `sumo-documentation` | `README.md`, `docs/PLANNING_phase_1_MVP.md`, `docs/PLANNING_phase_2_STREAMING_PIPELINE.md`, `docs/architecture.md`, `docs/SUMO_RESEARCH.md`, Sopir naming | "update the README", "explain what SUMO models", "rename in the docs" |
 
 ### What the skills encode that the repo does not
 
@@ -166,7 +166,7 @@ Documentation was rebranded from OpenDriveLab to Sopir:
 |------|--------|
 | `AGENTS.md` | title |
 | `README.md` | title |
-| `PLANNING.md` | title |
+| `PLANNING.md` (now `docs/PLANNING_phase_1_MVP.md`) | title |
 | `docs/architecture.md` | title |
 
 Left as `OpenDriveLab` / `opendrivelab` on purpose, because these are runtime

@@ -26,5 +26,39 @@ class Settings(BaseSettings):
         validation_alias="SCENARIO_TEMPLATES_DIR",
     )
 
+    # Streaming / Kafka
+    kafka_bootstrap_servers: str = Field(
+        default="redpanda:9092",
+        validation_alias="KAFKA_BOOTSTRAP_SERVERS",
+    )
+    schema_registry_url: str = Field(
+        default="http://redpanda:8081",
+        validation_alias="SCHEMA_REGISTRY_URL",
+    )
+
+    # S3-compatible object store (LocalStack for local dev)
+    s3_endpoint: str = Field(
+        default="http://localstack:4566",
+        validation_alias="S3_ENDPOINT",
+    )
+    s3_access_key: str = Field(
+        default="test",
+        validation_alias="S3_ACCESS_KEY",
+    )
+    s3_secret_key: str = Field(
+        default="test",
+        validation_alias="S3_SECRET_KEY",
+    )
+    s3_bucket: str = Field(
+        default="sopir-raw",
+        validation_alias="S3_BUCKET",
+    )
+
+    # Telemetry sink selection: "postgres" or "kafka"
+    telemetry_sink: str = Field(
+        default="postgres",
+        validation_alias="TELEMETRY_SINK",
+    )
+
 
 settings = Settings()

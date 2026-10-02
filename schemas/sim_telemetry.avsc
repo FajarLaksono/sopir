@@ -1,0 +1,18 @@
+{
+  "type": "record",
+  "name": "SimTelemetry",
+  "namespace": "sopir.sim",
+  "fields": [
+    { "name": "schema_version", "type": "string", "default": "1.0.0" },
+    { "name": "event_id", "type": "string" },
+    { "name": "run_id", "type": "string" },
+    { "name": "vehicle_id", "type": "string" },
+    { "name": "captured_at", "type": "long", "logicalType": "timestamp-millis" },
+    { "name": "step", "type": "int" },
+    { "name": "x", "type": "double" },
+    { "name": "y", "type": "double" },
+    { "name": "speed", "type": "double" },
+    { "name": "angle", "type": "double" },
+    { "name": "lane_id", "type": "string" }
+  ]
+}
