@@ -1,0 +1,9 @@
+# Core dependencies
+pydantic==2.5.3
+pydantic-settings==2.1.0
+
+# Database
+alembic==1.13.1
+sqlalchemy==2.0.25
+psycopg2-binary==2.9.9
+asyncpg==0.29.0

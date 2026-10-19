@@ -4,3 +4,4 @@ DonkeyCarSim/
 venv/
 data/
 MyNotes
+__pycache__

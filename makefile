@@ -40,12 +40,14 @@ endif
 HELPER := $(PY_BOOTSTRAP) tools/donkeycar_setup.py
 DEPS_STAMP := $(VENV)/.deps-installed
 SIM_STAMP := $(VENV)/.sim-installed
+REQUIREMENTS := requirements.txt
+BACKEND_DEPS_STAMP := $(VENV)/.backend-deps-installed
 
 # Menus
 help: ## Show this help
 	@$(HELPER) help makefile
 
-setup: deps download-sim check ## Venv, dependencies and simulator download
+setup: backend-deps deps download-sim check ## Venv, dependencies and simulator download ## Venv, dependencies and simulator download
 	
 venv: $(VPY_FILE) ## Create the virtual environment only
  
@@ -59,6 +61,12 @@ $(DEPS_STAMP): $(VPY_FILE)
 	$(VPY) -m pip uninstall -y gym-donkeycar gym
 	$(VPY) -m pip install $(GYM_PKG) gymnasium pillow
 	@$(HELPER) stamp $(DEPS_STAMP)
+
+backend-deps: $(BACKEND_DEPS_STAMP) ## Install backend dependencies
+$(BACKEND_DEPS_STAMP): $(VPY_FILE) $(REQUIREMENTS)
+	$(VPY) -m pip install --upgrade pip
+	$(VPY) -m pip install -r $(REQUIREMENTS)
+	@$(HELPER) stamp $(BACKEND_DEPS_STAMP)
 
 download-sim: $(SIM_STAMP) ## Download the simulator unless one is already in the project
 	
