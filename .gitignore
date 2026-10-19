@@ -1,32 +1,6 @@
-# Environment variables (secrets)
 .env
-
-# Ignore the following files and directories
-Automated Driving Portfolio Guidance.pdf
-MyNote.txt
-
-# log files
-.coverage
-
-# Python
-__pycache__/
-*.py[cod]
-*.egg-info/
-dist/
-build/
-.venv/
+downloads/
+DonkeyCarSim/
 venv/
-
-# Jupyter
-.ipynb_checkpoints/
-
-# IDE
-.vscode/
-.idea/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# QA
-.pytest_cache/
+data/
+MyNotes
