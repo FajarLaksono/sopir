@@ -18,6 +18,25 @@ services:
     networks:
       - sopirlab
 
+  backend:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_HOST: db            # inside compose, the DB service is reached as "db"
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME}
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-change-me}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    networks:
+      - sopirlab
+
 volumes:
   postgres_data:
 

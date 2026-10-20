@@ -48,4 +48,11 @@ class Settings(BaseSettings):
     def sync_database_url(self) -> str:
         return self.database_url.replace("postgresql+asyncpg://", "postgresql://", 1)
 
+    secret_key: str = Field(
+        default="dev-secret-change-me",
+        env="SECRET_KEY"
+    )
+
+    
+
 Settings = Settings()

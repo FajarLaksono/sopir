@@ -1,7 +1,12 @@
+venv/
+.git/
 .env
 downloads/
 DonkeyCarSim/
-venv/
 data/
+frontend/
+docs/
+tools/
 MyNotes
-__pycache__
+__pycache__/
+*.pyc

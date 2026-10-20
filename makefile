@@ -68,6 +68,12 @@ $(BACKEND_DEPS_STAMP): $(VPY_FILE) $(REQUIREMENTS)
 	$(VPY) -m pip install -r $(REQUIREMENTS)
 	@$(HELPER) stamp $(BACKEND_DEPS_STAMP)
 
+db-migrate: ## Run Alembic migrations
+	$(VPY) -m alembic upgrade head
+
+backend-run: backend-deps ## Run the FastAPI dev server
+	$(VPY) -m uvicorn backend.main:app --reload
+
 download-sim: $(SIM_STAMP) ## Download the simulator unless one is already in the project
 	
 $(SIM_STAMP):

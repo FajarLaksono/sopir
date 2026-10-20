@@ -1,3 +1,6 @@
+# pyright: reportAttributeAccessIssue=false, reportGeneralTypeIssues=false
+# pylint: disable=no-member
+
 import os
 import sys
 from logging.config import fileConfig
@@ -11,6 +14,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.settings import Settings
 from backend.database import Base
+import backend.models 
 
 config = context.config
 

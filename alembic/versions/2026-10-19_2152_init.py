@@ -28,25 +28,53 @@ def upgrade() -> None:
             primary_key=True,
             server_default=sa.text('gen_random_uuid()'),
         ),
-        sa.Column('os', sa.String(length=10), nullable=False),
-        sa.Column('sdk_version', sa.String(length=10), nullable=False),
-        sa.Column('simulator_version', sa.String(length=10), nullable=False),
-        sa.Column('track_id', sa.String(length=100), nullable=False), # e.g. donkey-generated-track-v0
-        sa.Column('car_config', postgresql.JSONB(), nullable=True),
-        sa.Column('status', sa.String(length=10), nullable=False), # running / completed / crashed
-        sa.Column('ended_at', sa.DateTime(timezone=True), nullable=True), 
+        sa.Column(
+            'os', 
+            sa.String(length=10), 
+            nullable=False
+        ),
+        sa.Column(
+            'sdk_version', 
+            sa.String(length=10), 
+            nullable=False
+        ),
+        sa.Column(
+            'simulator_version', 
+            sa.String(length=10), 
+            nullable=False
+        ),
+        sa.Column(
+            'track_id', 
+            sa.String(length=100), 
+            nullable=False
+        ), # e.g. donkey-generated-track-v0
+        sa.Column(
+            'car_config', 
+            postgresql.JSONB(), 
+            nullable=True
+        ),
+        sa.Column(
+            'status', 
+            sa.String(length=10), 
+            nullable=False
+        ), # running / completed / crashed
+        sa.Column(
+            'ended_at', 
+            sa.DateTime(timezone=True), 
+            nullable=True
+        ), 
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
             nullable=False,
-            server_default=sa.text("now()"),
+            server_default=sa.text("now()")
         ),
         sa.Column(
             "updated_at",
             sa.DateTime(timezone=True),
             nullable=False,
-            server_default=sa.text("now()"),
-        ),
+            server_default=sa.text("now()")
+        )
     )
     # ### end Alembic commands ###
 
