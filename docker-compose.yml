@@ -18,6 +18,31 @@ services:
     networks:
       - sopirlab
 
+  redpanda:
+    image: redpandadata/redpanda:v24.2.18 
+    container_name: supirlab-redpanda
+    command: 
+      - redpanda
+      - start
+      - --smp
+      - "1"
+      - --overprovisioned
+      - --node-id
+      - "0"
+      - --kafka-addr
+      - internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr
+      - internal://redpanda:9092,external://localhost:19092
+    ports:
+      - "19092:19092"
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -q 'Healthy.*true'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: 
+      - sopirlab
+
   backend:
     build: .
     ports:

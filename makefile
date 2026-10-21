@@ -71,6 +71,12 @@ $(BACKEND_DEPS_STAMP): $(VPY_FILE) $(REQUIREMENTS)
 db-migrate: ## Run Alembic migrations
 	$(VPY) -m alembic upgrade head
 
+db-run: ## Start the database
+	docker-compose up -d db
+
+db-stop: ## Stop the database
+	docker-compose stop db
+
 backend-run: backend-deps ## Run the FastAPI dev server
 	$(VPY) -m uvicorn backend.main:app --reload
 
@@ -80,22 +86,31 @@ $(SIM_STAMP):
 	$(HELPER) download-sim --sim-dir $(SIM_DIR) --dl-dir $(DL_DIR) $(if $(SIM_URL),--url $(SIM_URL))
 	@$(HELPER) stamp $(SIM_STAMP)
 
-sim-force: ## Re-download the simulator even if one already exists
+download-sim-force: ## Re-download the simulator even if one already exists
 	$(HELPER) download-sim --sim-dir $(SIM_DIR) --dl-dir $(DL_DIR) --force $(if $(SIM_URL),--url $(SIM_URL))
 	@$(HELPER) stamp $(SIM_STAMP)
 
 check: $(DEPS_STAMP) ## Verify donkey envs are registered in Gymnasium
 	@$(VPY) tools/donkeycar_setup.py check
 
-run-sim: $(SIM_STAMP) ## Launch the simulator
+sim-run: $(SIM_STAMP) ## Launch the simulator
 	@$(HELPER) run-sim --sim-dir $(SIM_DIR)
 
-stop-sim: ## Kill any running simulator
+sim-stop: ## Kill any running simulator
 	@$(HELPER) stop-sim
 
-test: $(DEPS_STAMP) ## Run test_sim.py (sim must be running)
+driver-run-test: $(DEPS_STAMP) ## Run test_sim.py (sim must be running)
 	@$(HELPER) wait-sim --host $(SIM_HOST) --port $(SIM_PORT)
 	$(VPY) tools/test_sim_data_telemetry.py
+
+broker-run: ## Start the Redpanda stream broker
+	docker compose up -d redpanda
+
+broker-stop: ## Stop the Redpanda stream broker
+	docker compose stop redpanda
+
+broker-peak: ## Peek at the telemetry topic (from the beginning)
+	docker exec -it sopirlab-redpanda rpk ropic consume telemetry --from-beginning
 
 # clean: stop-sim ## Remove downloads and the simulator folder
 # 	@$(HELPER) clean $(DL_DIR) $(SIM_DIR)

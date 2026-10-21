@@ -15,3 +15,9 @@ asyncpg==0.29.0
 passlib[bcrypt]==1.7.4
 bcrypt==4.0.1
 PyJWT==2.10.1
+
+# Streaming
+confluent-kafka==2.5.3
+
+# Prodicer CLI (HTTP client)
+requests==2.32.3
