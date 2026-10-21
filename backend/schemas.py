@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
+from typing import Any, Literal
 
 
 class SeasonCreate(BaseModel):
@@ -11,6 +12,7 @@ class SeasonCreate(BaseModel):
     simulator_version: str = Field(max_length=10)
     track_id: str = Field(max_length=100)
     car_config: dict[str, Any] | None = None
+    driver: Literal["random", "rl"] = "random"
 
 class SeasonRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)

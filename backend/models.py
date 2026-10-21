@@ -38,6 +38,10 @@ class Seasons(Base):
         JSONB, 
         nullable=True
     )
+    driver: Mapped[str] = mapped_column(
+        String(10), 
+        nullable=False
+    )  # random / rl (Reinfocement learning model)
     status: Mapped[str] = mapped_column(
         String(10), 
         nullable=False

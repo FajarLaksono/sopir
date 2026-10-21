@@ -16,35 +16,15 @@ from backend.database import get_db
 
 router = APIRouter(prefix="/seasons", tags=["seasons"])
 
+
 @router.post("", response_model=schemas.SeasonRead, status_code=201)
 def create_season(
-    data: schemas.SeasonCreate, 
+    data: schemas.SeasonCreate,
     db: Session = Depends(get_db),
     user: Users = Depends(auth.get_current_user),
-    ):
+):
     return handlers.create_season(db, data)
 
-@router.put("/{season_id}/complete", response_model=schemas.SeasonRead)
-def complete_season_status(
-    season_id: UUID, 
-    db: Session = Depends(get_db), 
-    user: Users = Depends(auth.get_current_user),
-    ):
-    season = handlers.complete_season_status(db, season_id)
-    if season is None:
-        raise HTTPException(status_code=404, detail="Season not found")
-    return season
-
-@router.put("/{season_id}/crash", response_model=schemas.SeasonRead)
-def crash_season_status(
-    season_id: UUID, 
-    db: Session = Depends(get_db), 
-    user: Users = Depends(auth.get_current_user),
-    ):
-    season = handlers.crash_season_status(db, season_id)
-    if season is None:
-        raise HTTPException(status_code=404, detail="Season not found")
-    return season
 
 @router.get("", response_model=list[schemas.SeasonRead])
 def list_seasons(
@@ -53,9 +33,10 @@ def list_seasons(
 ):
     return handlers.list_seasons(db)
 
+
 @router.get("/{season_id}", response_model=schemas.SeasonRead)
 def get_season(
-    season_id: UUID, 
+    season_id: UUID,
     db: Session = Depends(get_db),
     user: Users = Depends(auth.get_current_user),
 ):

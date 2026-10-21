@@ -15,6 +15,7 @@ def create_season(db: Session, season: schemas.SeasonCreate) -> models.Seasons:
         track_id=season.track_id,
         car_config=season.car_config,
         status="running",
+        driver=season.driver,
     )
     db.add(db_season)
     db.commit()
