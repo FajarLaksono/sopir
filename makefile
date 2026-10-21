@@ -109,8 +109,11 @@ broker-run: ## Start the Redpanda stream broker
 broker-stop: ## Stop the Redpanda stream broker
 	docker compose stop redpanda
 
-broker-peak: ## Peek at the telemetry topic (from the beginning)
-	docker exec -it sopirlab-redpanda rpk ropic consume telemetry --from-beginning
+broker-peek: ## Peek at the telemetry topic (from the beginning)
+	docker exec -it sopirlab-redpanda rpk topic consume telemetry --offset start
+
+broker-clean: ## Delete the telemetry topic (auto-recreated on next produce)
+	docker exec -it sopirlab-redpanda rpk topic delete telemetry
 
 # clean: stop-sim ## Remove downloads and the simulator folder
 # 	@$(HELPER) clean $(DL_DIR) $(SIM_DIR)

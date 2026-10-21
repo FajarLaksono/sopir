@@ -20,7 +20,7 @@ services:
 
   redpanda:
     image: redpandadata/redpanda:v24.2.18 
-    container_name: supirlab-redpanda
+    container_name: sopirlab-redpanda
     command: 
       - redpanda
       - start
