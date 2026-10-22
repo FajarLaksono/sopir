@@ -14,7 +14,6 @@ def create_season(db: Session, season: schemas.SeasonCreate) -> models.Seasons:
         simulator_version=season.simulator_version,
         track_id=season.track_id,
         car_config=season.car_config,
-        status="running",
         driver=season.driver,
     )
     db.add(db_season)
@@ -22,29 +21,11 @@ def create_season(db: Session, season: schemas.SeasonCreate) -> models.Seasons:
     db.refresh(db_season)
     return db_season
 
-def complete_season_status(db: Session, season_id: UUID) -> models.Seasons | None:
-    db_season = get_season(db, season_id)
-    if db_season is None:
-        return None
-    
-    db_season.status = "completed"
-    db.commit()
-    db.refresh(db_season)
-    return db_season
-
-def crash_season_status(db: Session, season_id: UUID) -> models.Seasons | None:
-    db_season = get_season(db, season_id)
-    if db_season is None:
-        return None
-    
-    db_season.status = "crashed"
-    db.commit()
-    db.refresh(db_season)
-    return db_season
 
 def list_seasons(db: Session) -> list[models.Seasons]:
     return db.execute(select(models.Seasons)).scalars().all()
 
 def get_season(db: Session, season_id: UUID) -> models.Seasons | None:
-    return db.execute(select(models.Seasons).where(models.Seasons.id == season_id)).scalar_one_or_none()
-
+    return db.execute(
+        select(models.Seasons).where(models.Seasons.id == season_id)
+    ).scalar_one_or_none()

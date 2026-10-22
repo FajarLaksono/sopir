@@ -62,6 +62,24 @@ services:
     networks:
       - sopirlab
 
+  worker:
+    build: .
+    command: python -m worker
+    depends_on:
+      db:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+    environment:
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME}
+      KAFKA_BOOTSTRAP: redpanda:9092
+    networks:
+      - sopirlab
+
 volumes:
   postgres_data:
 

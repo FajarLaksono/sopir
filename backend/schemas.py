@@ -1,9 +1,8 @@
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
-from typing import Any, Literal
 
 
 class SeasonCreate(BaseModel):
@@ -24,8 +23,7 @@ class SeasonRead(BaseModel):
     simulator_version: str
     track_id: str
     car_config: dict[str, Any] | None
-    status: str
-    ended_at: datetime | None
+    driver: str
     created_at: datetime
     updated_at: datetime
 

@@ -38,6 +38,11 @@ class Settings(BaseSettings):
         env="DATABASE_URL"
     )
 
+    kafka_bootstrap: str = Field(
+        default="localhost:19092",
+        env="KAFKA_BOOTSTRAP",
+    )
+
     @property
     def database_url(self) -> str:
         if self.database_url_override:
