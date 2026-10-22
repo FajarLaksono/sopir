@@ -64,7 +64,7 @@ services:
 
   worker:
     build: .
-    command: python -m worker
+    command: python -u -m worker
     depends_on:
       db:
         condition: service_healthy

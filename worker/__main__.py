@@ -1,9 +1,12 @@
+import sys
 import time
 
 from confluent_kafka import Consumer, KafkaException
 
 from worker import handlers
 from backend.settings import Settings
+
+sys.stdout.reconfigure(line_buffering=True)
 
 TOPIC = "telemetry"
 GROUP_ID = "ingest-workers"

@@ -116,7 +116,7 @@ broker-clean: ## Delete the telemetry topic (auto-recreated on next produce)
 	docker exec -it sopirlab-redpanda rpk topic delete telemetry
 
 worker-run: backend-deps ## Run the worker ingest consumer (host)
-	$(VPY) -m backend.worker
+	$(VPY) -u -m backend.worker
 
 # clean: stop-sim ## Remove downloads and the simulator folder
 # 	@$(HELPER) clean $(DL_DIR) $(SIM_DIR)
