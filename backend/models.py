@@ -102,7 +102,7 @@ class Telemetry(Base):
     gyro_x: Mapped[float] = mapped_column(Float, nullable=False)
     gyro_y: Mapped[float] = mapped_column(Float, nullable=False)
     gyro_z: Mapped[float] = mapped_column(Float, nullable=False)
-    hit: Mapped[str] = mapped_column(String(20), nullable=False)
+    hit: Mapped[str] = mapped_column(String(100), nullable=False)
     reward: Mapped[float] = mapped_column(Float, nullable=False)
     lap_count: Mapped[int] = mapped_column(Integer, nullable=False)
     last_lap_time: Mapped[float] = mapped_column(Float, nullable=False)
