@@ -1,7 +1,8 @@
 import sys
 import time
 
-from confluent_kafka import Consumer, KafkaException
+from confluent_kafka import Consumer, KafkaError, KafkaException
+from confluent_kafka.admin import AdminClient, NewTopic
 
 from worker.ingestors import handlers
 from backend.settings import Settings
@@ -13,6 +14,26 @@ GROUP_ID = "ingest-workers"
 BATCH_SIZE = 500        # "up to 500 messages or 1 second"
 BATCH_WINDOW_S = 1.0
 
+def ensure_topic() -> None:
+    admin = AdminClient({"bootstrap.servers": Settings.kafka_bootstrap})
+    while True:
+        try:
+            future = admin.create_topics(
+                [NewTopic(TOPIC, num_partitions=1, replication_factor=1)]
+            )[TOPIC]
+            future.result(timeout=10)
+            print(f"[ingest] created topic {TOPIC}")
+            return
+        except KafkaException as exc:
+            code = exc.args[0].code() if exc.args else None
+            if code == KafkaError.TOPIC_ALREADY_EXISTS:
+                print(f"[ingest] topic {TOPIC} already exists")
+                return
+            print(f"[ingest] broker not ready ({exc}); retrying in 2s")
+            time.sleep(2)
+        except TimeoutError:
+            print(f"[ingest] broker timed out; retrying in 2s")
+            time.sleep(2)
 
 def build_consumer() -> Consumer:
     conf = {
@@ -39,6 +60,7 @@ def collect_batch(consumer: Consumer) -> list:
 
 
 def main() -> None:
+    ensure_topic()
     consumer = build_consumer()
     consumer.subscribe([TOPIC])
     print(

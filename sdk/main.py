@@ -16,11 +16,14 @@ def main() -> None:
     parser.add_argument("--kafka", default="localhost:19092", help="broker bootstrap address")
     parser.add_argument("--sim-host", default="127.0.0.1", help="simulator host")
     parser.add_argument("--sim-port", type=int, default=9091, help="simulator port")
+    parser.add_argument(
+        "--model",
+        default="data/models/lka_ppo_final.zip",
+        help="PPO model used by --driver rl",
+    )
+
 
     args = parser.parse_args()
-
-    if args.driver == "rl":
-        sys.exit("The reinforcement learning driver is under contruction")
 
     # 1) login
     r = requests.post(
@@ -64,6 +67,7 @@ def main() -> None:
         sim_host=args.sim_host,
         sim_port=args.sim_port,
         producer=producer,
+        model_path=args.model,
     )
     season_driver.run()
     

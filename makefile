@@ -42,6 +42,8 @@ DEPS_STAMP := $(VENV)/.deps-installed
 SIM_STAMP := $(VENV)/.sim-installed
 REQUIREMENTS := requirements.txt
 BACKEND_DEPS_STAMP := $(VENV)/.backend-deps-installed
+RL_REQUIREMENTS := requirements-rl.txt
+RL_DEPS_STAMP := $(VENV)/.rl-deps-installed
 
 # Menus
 help: ## Show this help
@@ -125,10 +127,23 @@ broker-clean: ## Delete the telemetry topic (auto-recreated on next produce)
 	docker exec -it sopirlab-redpanda rpk topic delete telemetry
 
 worker-run: backend-deps ## Run the worker ingest consumer (host)
-	$(VPY) -u -m backend.worker
+	$(VPY) -u -m worker
 
 test-aggregates-kpi: backend-deps ## Run the KPI unit tests
 	$(VPY) -m pytest tests -v
+
+rl-deps: $(RL_DEPS_STAMP) ## Install CPU-only torch and stable-baselines3
+$(RL_DEPS_STAMP): $(VPY_FILE) $(RL_REQUIREMENTS)
+	$(VPY) -m pip install --upgrade pip
+	$(VPY) -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+	$(VPY) -m pip install -r $(RL_REQUIREMENTS)
+	@$(HELPER) stamp $(RL_DEPS_STAMP)
+
+train-lka: rl-deps ## Train the LKA PPO agent (resumes automatically)
+	$(VPY) tools/train_lka.py $(ARGS)
+
+test-rl: backend-deps deps ## Run the LKA unit tests (no sim needed)
+	$(VPY) -m pytest tests/sdk -v
 
 # clean: stop-sim ## Remove downloads and the simulator folder
 # 	@$(HELPER) clean $(DL_DIR) $(SIM_DIR)
