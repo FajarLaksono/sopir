@@ -41,3 +41,29 @@ class UserRead(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+class RunRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    season_id: uuid.UUID
+    driver: str
+    status: str
+    started_at: datetime
+    ended_at: datetime | None
+    summary: dict[str, Any] | None
+
+class SeasonDetail(SeasonRead):
+    runs: list[RunRead] = []
+
+class TelemetryPoint(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    tick: int
+    ts: float
+    speed: float
+    cte: float
+    pos_x: float
+    pos_y: float
+    steering: float
+    throttle: float

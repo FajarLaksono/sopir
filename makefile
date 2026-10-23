@@ -62,11 +62,23 @@ $(DEPS_STAMP): $(VPY_FILE)
 	$(VPY) -m pip install $(GYM_PKG) gymnasium pillow
 	@$(HELPER) stamp $(DEPS_STAMP)
 
+frontend-install: ## Install frontend dependencies
+	cd frontend && npm install
+
+frontend-dev: ## Run the Vite dev server (http://localhost:5173)
+	cd frontend && npm run dev
+
+frontend-build: ## Build the frontend into frontend/dist
+	cd frontend && npm run build
+
 backend-deps: $(BACKEND_DEPS_STAMP) ## Install backend dependencies
 $(BACKEND_DEPS_STAMP): $(VPY_FILE) $(REQUIREMENTS)
 	$(VPY) -m pip install --upgrade pip
 	$(VPY) -m pip install -r $(REQUIREMENTS)
 	@$(HELPER) stamp $(BACKEND_DEPS_STAMP)
+
+backend-run: backend-deps ## Run the FastAPI dev server
+	$(VPY) -m uvicorn backend.main:app --reload
 
 db-migrate: ## Run Alembic migrations
 	$(VPY) -m alembic upgrade head
@@ -76,9 +88,6 @@ db-run: ## Start the database
 
 db-stop: ## Stop the database
 	docker-compose stop db
-
-backend-run: backend-deps ## Run the FastAPI dev server
-	$(VPY) -m uvicorn backend.main:app --reload
 
 download-sim: $(SIM_STAMP) ## Download the simulator unless one is already in the project
 	
@@ -117,6 +126,9 @@ broker-clean: ## Delete the telemetry topic (auto-recreated on next produce)
 
 worker-run: backend-deps ## Run the worker ingest consumer (host)
 	$(VPY) -u -m backend.worker
+
+test-aggregates-kpi: backend-deps ## Run the KPI unit tests
+	$(VPY) -m pytest tests -v
 
 # clean: stop-sim ## Remove downloads and the simulator folder
 # 	@$(HELPER) clean $(DL_DIR) $(SIM_DIR)

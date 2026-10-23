@@ -1,0 +1,58 @@
+:root {
+  font-family: system-ui, sans-serif;
+  color: #222;
+  background: #f6f7f9;
+}
+body { margin: 0; }
+
+.login {
+  max-width: 320px;
+  margin: 15vh auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: center;
+}
+.login form { display: flex; flex-direction: column; gap: 8px; }
+input, select, button {
+  padding: 8px 10px;
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+}
+button { cursor: pointer; background: #2f7de1; color: #fff; border: none; }
+
+.dashboard { padding: 20px 28px; }
+.dashboard header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.pickers { display: flex; gap: 8px; }
+
+.cards { display: flex; gap: 16px; margin: 20px 0; flex-wrap: wrap; }
+.card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 16px 24px;
+  min-width: 120px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.card-value { font-size: 28px; font-weight: 700; }
+.card-label { color: #777; font-size: 13px; }
+
+.charts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+.charts section {
+  background: #fff;
+  border-radius: 10px;
+  padding: 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.charts section:nth-child(3) { grid-column: 1 / -1; }
+.error { color: #c0392b; }

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from backend.database import session_local
 from backend.models import Runs, Telemetry
+from worker.aggregates import kpi
 
 TELEMETRY_COLUMNS = (
     "tick", "ts", "steering", "throttle", "speed", "forward_vel", "cte",
@@ -43,14 +44,32 @@ def _telemetry_row(record: dict) -> dict:
 def _handle_run_end(session: Session, record: dict) -> int:
     run_id = uuid.UUID(record["run_id"])
     status = record.get("status", "completed")
+
+    # 1) Always (re)compute the summary — reprocessing recomputes the same
+    #    numbers, so this is safe to run again and again.
+    summary = kpi.compute(session, run_id)
+    session.execute(
+        update(Runs).where(Runs.id == run_id).values(summary=summary)
+    )
+
+    # 2) Close the run ONLY if it is still open. Replayed run_end markers
+    #    must not rewrite an already-final status/ended_at.
     result = session.execute(
         update(Runs)
         .where(Runs.id == run_id, Runs.status == "running")
         .values(status=status, ended_at=datetime.now(timezone.utc))
     )
     if result.rowcount == 0:
-        print(f"[ingest] run_end for unknown or already-closed run {str(run_id)[:8]}")
+        print(f"[ingest] run_end for already-closed or unknown run {str(run_id)[:8]}")
+
+    print(
+        f"[ingest] KPI for {str(run_id)[:8]}: "
+        f"pct_in_lane={summary['pct_in_lane']}% "
+        f"avg_speed={summary['avg_speed']} "
+        f"collisions={summary['collisions']}"
+    )
     return result.rowcount
+
 
 def handle_batch(batch: list) -> dict:
     """One transaction for the whole batch. Returns per-type counts."""

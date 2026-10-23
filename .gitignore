@@ -4,9 +4,9 @@ venv/
 downloads/
 DonkeyCarSim/
 data/
-frontend/
 docs/
 tools/
 MyNotes
 __pycache__/
 *.pyc
+.pytest_cache/
